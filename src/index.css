@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+html, body {
+  overflow-x: hidden !important;
+  width: 100% !important;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+* {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+@layer base {
+  :root {
+    --primary-color: #7AC74F;
+    --color-lime-green: #7AC74F;
+    --color-orange: #FF7A00;
+    --color-yellow: #FFD60A;
+    --color-white: #FFFFFF;
+    --color-black: #212121;
+  }
+}
+
+/* Boutons principaux ArtisanPro Afrique : Fond vert citron #7AC74F */
+.btn-artisan-primary {
+  background-color: #7AC74F;
+  color: #212121;
+  font-weight: 800;
+  transition: all 0.2s ease-in-out;
+}
+.btn-artisan-primary:hover {
+  background-color: #6BB343;
+  color: #000000;
+}
+
+/* ON CACHE SEULEMENT LES AUTRES BOUTONS DU HAUT SANS LES SUPPRIMER DU CODE */
+.header-notif, .header-param, .header-msg, .header-profil {
+  display: none !important;
+}
+
+/* LARGEUR 92% - TRÈS IMPORTANT */
+.feed-container {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 12px 0;
+}
+.post-card, .artisan-card, .marketplace-card {
+  width: 92% !important;
+  max-width: 720px !important;
+  margin: 14px auto !important;
+  border-radius: 18px !important;
+  overflow: hidden;
+  position: relative;
+}
+.post-card {
+  background: white;
+  border: 1px solid #E5E7EB;
+}
+.post-card img, .post-card video {
+  width: 100%;
+  max-width: 100%;
+  object-fit: cover;
+}

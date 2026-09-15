@@ -1,0 +1,210 @@
+{
+  "entities": {
+    "artisans": {
+      "title": "Artisans",
+      "description": "Collection des profils d'artisans qualifiés en Afrique",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "trade": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviewsCount": { "type": "number" },
+        "plan": { "type": "string" },
+        "emoji": { "type": "string" },
+        "services": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "verified": { "type": "boolean" },
+        "hourlyRate": { "type": "string" },
+        "profileViews": { "type": "number" },
+        "contactsCount": { "type": "number" },
+        "joinedDate": { "type": "string" },
+        "experienceYears": { "type": "number" },
+        "address": { "type": "string" },
+        "abonnement": { "type": "string" },
+        "abonnement_actif": { "type": "boolean" },
+        "statut_paiement": { "type": "string" },
+        "date_paiement": { "type": "string" },
+        "date_validation": { "type": "string" },
+        "valide_par": { "type": "string" },
+        "date_refus": { "type": "string" },
+        "refuse_par": { "type": "string" },
+        "methode_paiement": { "type": "string" },
+        "preuve_url": { "type": "string" },
+        "montant": { "type": "number" },
+        "pays": { "type": "string" },
+        "telephone_admin": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "trade", "city", "country", "phone"]
+    },
+    "clients": {
+      "title": "Clients",
+      "description": "Collection des utilisateurs et clients de la plateforme",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "phone": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "joinedDate": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "devis": {
+      "title": "Devis",
+      "description": "Collection des demandes de devis transmises aux artisans",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "artisanId": { "type": "string" },
+        "artisanName": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientPhone": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "description": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "budget": { "type": "string" },
+        "status": { "type": "string" },
+        "date": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["artisanId", "clientName", "clientPhone", "serviceType", "description"]
+    },
+    "messages": {
+      "title": "Messages",
+      "description": "Collection des messages de chat entre clients et artisans",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "recipientId": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["conversationId", "senderId", "recipientId", "content"]
+    },
+    "publications": {
+      "title": "Publications",
+      "description": "Fil d'actualité partagé globalement entre tous les artisans, admins et clients",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "author": { "type": "string" },
+        "role": { "type": "string" },
+        "isAdmin": { "type": "boolean" },
+        "isPub": { "type": "boolean" },
+        "artisanId": { "type": "number" },
+        "artisanName": { "type": "string" },
+        "artisanTrade": { "type": "string" },
+        "content": { "type": "string" },
+        "mediaType": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "price": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "content", "createdAt"]
+    },
+    "commentaires": {
+      "title": "Commentaires",
+      "description": "Commentaires et réponses imbriquées pour chaque publication",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "text": { "type": "string" },
+        "parentId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "postId", "userId", "text", "createdAt"]
+    },
+    "subscriptions": {
+      "title": "Subscriptions",
+      "description": "Table des abonnements des utilisateurs et artisans sur ArtisanPro",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "plan": { "type": "string", "enum": ["essential", "pro", "premium"] },
+        "price": { "type": "number" },
+        "currency": { "type": "string", "enum": ["XOF"] },
+        "billing_period": { "type": "string", "enum": ["monthly", "yearly"] },
+        "status": { "type": "string", "enum": ["pending", "active", "expired"] },
+        "start_date": { "type": "string" },
+        "end_date": { "type": "string" },
+        "payment_provider": { "type": "string" },
+        "transaction_id": { "type": "string" }
+      },
+      "required": ["id", "user_id", "plan", "price", "currency", "billing_period", "status", "start_date", "end_date"]
+    },
+    "payments": {
+      "title": "Payments",
+      "description": "Table des paiements (abonnements et prestations) sur la plateforme",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "subscription_id": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "payment_type": { "type": "string", "enum": ["subscription", "service_payment"] },
+        "payment_method": { "type": "string" },
+        "provider": { "type": "string" },
+        "transaction_id": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "user_id", "amount", "currency", "payment_type", "payment_method", "provider", "transaction_id", "status"]
+    },
+    "admin_config": {
+      "title": "Admin Config",
+      "description": "Configuration persistante et solde du compte propriétaire boss",
+      "type": "object",
+      "properties": {
+        "solde": { "type": "number" },
+        "telephone_prive": { "type": "string" },
+        "derniere_recharge": { "type": "string" },
+        "recharge_par": { "type": "string" },
+        "admins_autorises": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "transactions_admin": {
+      "title": "Transactions Admin",
+      "description": "Historique des recharges et opérations financières du compte administrateur boss",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "montant": { "type": "number" },
+        "numero": { "type": "string" },
+        "operateur": { "type": "string" },
+        "par": { "type": "string" },
+        "date": { "type": "string" },
+        "solde_apres": { "type": "number" }
+      },
+      "required": ["type", "montant", "numero", "operateur", "par"]
+    }
+  }
+}

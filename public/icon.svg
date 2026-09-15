@@ -1,0 +1,49 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="limeGrad" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#8EE061" />
+      <stop offset="100%" stopColor="#7AC74F" />
+    </linearGradient>
+    <linearGradient id="orangeGrad" x1="20" y1="20" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#FF9326" />
+      <stop offset="100%" stopColor="#FF7A00" />
+    </linearGradient>
+    <linearGradient id="yellowGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#FFF066" />
+      <stop offset="100%" stopColor="#FFD60A" />
+    </linearGradient>
+  </defs>
+
+  <!-- Fond Badge Vert Citron #7AC74F -->
+  <rect x="6" y="6" width="108" height="108" rx="26" fill="url(#limeGrad)" stroke="#5FA837" stroke-width="2.5" />
+
+  <!-- Motifs géométriques africains -->
+  <g stroke="#212121" stroke-width="1.2" opacity="0.35" fill="none">
+    <path d="M16 16 L22 22 L28 16" />
+    <path d="M92 16 L98 22 L104 16" />
+    <polygon points="12,60 16,56 20,60 16,64" fill="#FFD60A" opacity="0.6" />
+    <polygon points="100,60 104,56 108,60 104,64" fill="#FFD60A" opacity="0.6" />
+    <path d="M16 104 L22 98 L28 104" />
+    <path d="M92 104 L98 98 L104 104" />
+  </g>
+
+  <!-- Carte Afrique en Orange Vif #FF7A00 -->
+  <path d="M48 24 C56 24, 66 26, 73 31 C77 34, 82 39, 83 45 C84 49, 81 52, 79 55 C77 58, 77 62, 75 66 C73 70, 69 77, 66 82 C63 88, 59 94, 57 96 C55 94, 53 88, 51 83 C48 76, 45 73, 42 69 C39 65, 34 62, 33 57 C31 51, 33 46, 36 43 C39 40, 42 37, 43 33 C44 28, 45 24, 48 24 Z" fill="url(#orangeGrad)" stroke="#D96300" stroke-width="1.5" />
+
+  <!-- Marteau d'artisan en Orange Vif #FF7A00 & Manche Noir #212121 -->
+  <g transform="rotate(-28 60 60)">
+    <rect x="56.5" y="32" width="7" height="56" rx="3.5" fill="#212121" stroke="#FFD60A" stroke-width="1" />
+    <rect x="44" y="26" width="32" height="13" rx="3" fill="#FF7A00" stroke="#FFFFFF" stroke-width="1.2" />
+    <path d="M44 28 C38 30, 36 34, 38 38 L44 38 Z" fill="#D96300" />
+  </g>
+
+  <!-- Aiguille de couture en Jaune Soleil #FFD60A -->
+  <g transform="rotate(32 60 60)">
+    <path d="M58.5 22 L61.5 22 L61 88 C60.5 92, 59.5 92, 59 88 Z" fill="url(#yellowGrad)" stroke="#212121" stroke-width="1" />
+    <ellipse cx="60" cy="28" rx="1.2" ry="4" fill="#212121" />
+    <path d="M60 28 C64 24, 70 26, 72 30 C74 34, 70 38, 76 42" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" fill="none" />
+  </g>
+
+  <!-- Étoile jaune soleil #FFD60A -->
+  <path d="M86 28 L88 34 L94 36 L88 38 L86 44 L84 38 L78 36 L84 34 Z" fill="#FFD60A" stroke="#212121" stroke-width="0.8" />
+</svg>

@@ -1,0 +1,1068 @@
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type {
+  Artisan,
+  Plan,
+  User,
+  MarketplaceService,
+  AppNotification,
+  PlanType,
+  SocialPost,
+  SocialCommunityLinks,
+  WithdrawalRequest,
+} from '../types.ts';
+import { api } from '../services/api.ts';
+import { firestoreService } from '../services/firestoreService.ts';
+import {
+  INITIAL_ARTISANS,
+  INITIAL_CLIENTS,
+  INITIAL_PLANS,
+  INITIAL_SERVICES,
+  INITIAL_NOTIFICATIONS,
+} from '../data/initialData.ts';
+import {
+  INITIAL_POSTS,
+  DEFAULT_COMMUNITY_LINKS,
+  INITIAL_WITHDRAWALS,
+} from '../data/socialFeedData.ts';
+import { isExactAdminEmail, getAdminUserByEmail } from '../config/adminConfig.ts';
+
+export type PageName =
+  | 'home'
+  | 'search'
+  | 'profile'
+  | 'map'
+  | 'market'
+  | 'messages'
+  | 'subscription'
+  | 'account'
+  | 'register'
+  | 'admin'
+  | 'admin-login';
+
+interface ToastInfo {
+  title: string;
+  desc?: string;
+  type?: 'success' | 'info' | 'warning';
+}
+
+interface ActiveOtpData {
+  code: string;
+  identifier: string;
+  expiresAt: number;
+}
+
+interface AppContextType {
+  page: PageName;
+  go: (page: PageName) => void;
+  currentUser: User | null;
+  currentArtisan: Artisan | null;
+  artisans: Artisan[];
+  plans: Plan[];
+  services: MarketplaceService[];
+  selectedArtisanId: number | null;
+  setSelectedArtisanId: (id: number | null) => void;
+  selectedArtisan: Artisan | null;
+  notifications: AppNotification[];
+  unreadNotifsCount: number;
+  markNotifAsRead: (id: string) => Promise<void>;
+  markAllNotifsAsRead: () => Promise<void>;
+  userLocation: { lat: number; lng: number } | null;
+  locationError: string | null;
+  isLocating: boolean;
+  requestUserLocation: () => void;
+  calculateDistance: (lat: number, lng: number) => number | null;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  selectedTrade: string;
+  setSelectedTrade: (t: string) => void;
+  selectedCity: string;
+  setSelectedCity: (c: string) => void;
+  toast: ToastInfo | null;
+  showToast: (t: ToastInfo) => void;
+  // Social feed & community
+  socialPosts: SocialPost[];
+  createSocialPost: (data: Partial<SocialPost>) => Promise<void>;
+  likeSocialPost: (postId: string) => Promise<void>;
+  addPostComment: (postId: string, text: string) => Promise<void>;
+  communityLinks: SocialCommunityLinks;
+  updateCommunityLinks: (links: Partial<SocialCommunityLinks>) => Promise<void>;
+  // Wallet & Monetization
+  walletBalance: number;
+  creditArtisanWallet: (amount: number, description?: string) => void;
+  withdrawals: WithdrawalRequest[];
+  requestWithdrawal: (data: {
+    operator: 'Orange Money' | 'MTN Mobile Money' | 'Moov Money' | 'Wave';
+    amount: number;
+    phone: string;
+    currency?: string;
+  }) => Promise<void>;
+  updateWithdrawalStatus: (id: string, status: 'approuve' | 'refuse') => Promise<void>;
+  approveWithdrawal: (id: string) => Promise<void>;
+  rejectWithdrawal: (id: string) => Promise<void>;
+  // Users & Admin
+  users: User[];
+  deleteUser: (userId: string) => Promise<void>;
+  deleteArtisan: (artisanId: number) => Promise<void>;
+  // Follow artisans
+  followingArtisans: number[];
+  toggleFollowArtisan: (artisanId: number) => void;
+  // OTP Verification
+  activeOtp: ActiveOtpData | null;
+  sendOtp: (identifier: string, type?: 'inscription' | 'reconnexion') => Promise<string>;
+  verifyOtp: (identifier: string, code: string) => boolean;
+  // Modals
+  quoteModal: {
+    isOpen: boolean;
+    artisan: Artisan | null;
+    serviceTitle?: string;
+    open: (artisan: Artisan, serviceTitle?: string) => void;
+    close: () => void;
+  };
+  paymentModal: {
+    isOpen: boolean;
+    plan: PlanType;
+    service?: MarketplaceService;
+    customTitle?: string;
+    customAmount?: number;
+    open: (
+      planOrConfig?:
+        | PlanType
+        | {
+            plan?: PlanType;
+            service?: MarketplaceService;
+            customTitle?: string;
+            customAmount?: number;
+          }
+    ) => void;
+    close: () => void;
+  };
+  supportModal: {
+    isOpen: boolean;
+    initialTopic?: string;
+    open: (topic?: string) => void;
+    close: () => void;
+  };
+  authModal: {
+    isOpen: boolean;
+    initialTab: 'login' | 'register' | 'demo';
+    open: (tab?: 'login' | 'register' | 'demo') => void;
+    close: () => void;
+  };
+  refreshData: () => Promise<void>;
+  switchUser: (user: User, redirect?: boolean) => Promise<void>;
+  updateUserProfile: (userData: Partial<User>, artisanData?: Partial<Artisan>) => Promise<void>;
+  logout: () => void;
+  startChatWithArtisan: (artisanId: number) => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+// Default coordinates: Abidjan Cocody (5.3599, -3.9870)
+export const DEFAULT_COORDS = { lat: 5.3599, lng: -3.9870 };
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Restore session synchronously from localStorage (Facebook-style persistent session)
+  const initialIsLoggedIn =
+    typeof window !== 'undefined' && localStorage.getItem('isLoggedIn') === 'true';
+
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (initialIsLoggedIn) {
+      try {
+        const raw = localStorage.getItem('userData');
+        if (raw) {
+          const parsed: User = JSON.parse(raw);
+          if (isExactAdminEmail(parsed?.email)) {
+            parsed.role = 'super_admin';
+            try {
+              localStorage.setItem('userData', JSON.stringify(parsed));
+            } catch {}
+          }
+          return parsed;
+        }
+      } catch (e) {
+        console.warn('Error reading stored userData:', e);
+      }
+    }
+    return null;
+  });
+
+  // Always start on home (feed of artisans), never on account/profile
+  const [page, setPage] = useState<PageName>('home');
+  const [artisans, setArtisans] = useState<Artisan[]>([]);
+  const [users, setUsers] = useState<User[]>(INITIAL_CLIENTS);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [services, setServices] = useState<MarketplaceService[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [currentArtisan, setCurrentArtisan] = useState<Artisan | null>(null);
+  const [selectedArtisanId, setSelectedArtisanId] = useState<number | null>(null);
+
+  // Search & Filters
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedTrade, setSelectedTrade] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<string>('');
+
+  // Geolocation
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+
+  // Follow artisans
+  const [followingArtisans, setFollowingArtisans] = useState<number[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('artisanpro_following');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {
+        console.warn('Error loading following artisans:', e);
+      }
+    }
+    return [];
+  });
+
+  // Social feed & community links
+  const [socialPosts, setSocialPosts] = useState<SocialPost[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('artisanpro_social_posts');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {
+        console.warn('Error loading social posts:', e);
+      }
+    }
+    return INITIAL_POSTS;
+  });
+
+  const [communityLinks, setCommunityLinks] = useState<SocialCommunityLinks>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('artisanpro_community_links');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {
+        console.warn('Error loading community links:', e);
+      }
+    }
+    return DEFAULT_COMMUNITY_LINKS;
+  });
+
+  // Wallet & Withdrawals: Nouveau solde initial = 0 FCFA (augmente seulement quand un client paie)
+  const [walletBalance, setWalletBalance] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('artisanpro_wallet_balance');
+        if (stored !== null && stored !== undefined) return Number(stored);
+      } catch (e) {
+        console.warn('Error loading wallet balance:', e);
+      }
+    }
+    return 0; // Default: 0 FCFA
+  });
+
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('artisanpro_withdrawals');
+        if (stored) return JSON.parse(stored);
+      } catch (e) {
+        console.warn('Error loading withdrawals:', e);
+      }
+    }
+    return INITIAL_WITHDRAWALS;
+  });
+
+  // OTP State (Prompt 1: 5 minutes expiry)
+  const [activeOtp, setActiveOtp] = useState<ActiveOtpData | null>(null);
+
+  // Toast
+  const [toast, setToast] = useState<ToastInfo | null>(null);
+
+  // Modals
+  const [quoteModalOpen, setQuoteModalOpen] = useState<boolean>(false);
+  const [quoteTargetArtisan, setQuoteTargetArtisan] = useState<Artisan | null>(null);
+  const [quoteServiceTitle, setQuoteServiceTitle] = useState<string | undefined>(undefined);
+
+  const [paymentModalOpen, setPaymentModalOpen] = useState<boolean>(false);
+  const [paymentPlan, setPaymentPlan] = useState<PlanType>('Pro');
+  const [paymentService, setPaymentService] = useState<MarketplaceService | undefined>(undefined);
+  const [paymentCustomTitle, setPaymentCustomTitle] = useState<string | undefined>(undefined);
+  const [paymentCustomAmount, setPaymentCustomAmount] = useState<number | undefined>(undefined);
+
+  const [supportModalOpen, setSupportModalOpen] = useState<boolean>(false);
+  const [supportTopic, setSupportTopic] = useState<string | undefined>(undefined);
+
+  const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register' | 'demo'>('login');
+
+  const showToast = useCallback((t: ToastInfo) => {
+    setToast(t);
+    setTimeout(() => {
+      setToast((prev) => (prev?.title === t.title ? null : prev));
+    }, 4500);
+  }, []);
+
+  const go = useCallback((targetPage: PageName) => {
+    setPage(targetPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const refreshData = useCallback(async () => {
+    try {
+      const [artList, planList, srvList, notifList, userList] = await Promise.all([
+        api.getArtisans().catch(() => INITIAL_ARTISANS),
+        api.getPlans().catch(() => INITIAL_PLANS),
+        api.getServices().catch(() => INITIAL_SERVICES),
+        api.getNotifications(currentUser?.id).catch(() => INITIAL_NOTIFICATIONS),
+        api.getUsers().catch(() => INITIAL_CLIENTS),
+      ]);
+
+      const resolvedArtisans = artList && artList.length > 0 ? artList : INITIAL_ARTISANS;
+      const resolvedPlans = planList && planList.length > 0 ? planList : INITIAL_PLANS;
+      const resolvedServices = srvList && srvList.length > 0 ? srvList : INITIAL_SERVICES;
+      const resolvedNotifs = notifList && notifList.length > 0 ? notifList : INITIAL_NOTIFICATIONS;
+      const resolvedUsers = userList && userList.length > 0 ? userList : INITIAL_CLIENTS;
+
+      setArtisans(resolvedArtisans);
+      setUsers(resolvedUsers);
+      setPlans(resolvedPlans);
+      setServices(resolvedServices);
+      setNotifications(resolvedNotifs);
+
+      // Facebook-style persistent session restoration
+      const isLogged =
+        typeof window !== 'undefined' && localStorage.getItem('isLoggedIn') === 'true';
+      const savedUserId =
+        typeof window !== 'undefined' ? localStorage.getItem('artisanpro_user_id') : null;
+      const savedEmail =
+        typeof window !== 'undefined' ? localStorage.getItem('email') : null;
+
+      if (isLogged) {
+        let userToSet: User | null = null;
+        if (resolvedUsers.length > 0) {
+          userToSet =
+            resolvedUsers.find(
+              (u) =>
+                u.id === savedUserId ||
+                (savedEmail && u.email?.toLowerCase() === savedEmail.toLowerCase())
+            ) || null;
+        }
+        if (!userToSet) {
+          try {
+            const raw = localStorage.getItem('userData');
+            if (raw) userToSet = JSON.parse(raw);
+          } catch {}
+        }
+        if (userToSet) {
+          setCurrentUser(userToSet);
+          localStorage.setItem('userData', JSON.stringify(userToSet));
+          if (userToSet.artisanId) {
+            const art = resolvedArtisans.find((a) => a.id === userToSet!.artisanId) || null;
+            setCurrentArtisan(art);
+          }
+        }
+      } else if (currentUser?.artisanId) {
+        const art = resolvedArtisans.find((a) => a.id === currentUser.artisanId) || null;
+        setCurrentArtisan(art);
+      }
+    } catch (err) {
+      console.warn('Silent fallback on initial data fetch:', err);
+      setArtisans((prev) => (prev.length > 0 ? prev : INITIAL_ARTISANS));
+      setPlans((prev) => (prev.length > 0 ? prev : INITIAL_PLANS));
+      setServices((prev) => (prev.length > 0 ? prev : INITIAL_SERVICES));
+      setNotifications((prev) => (prev.length > 0 ? prev : INITIAL_NOTIFICATIONS));
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    refreshData();
+    // Subscribe to live Firestore updates
+    const unsubscribe = firestoreService.onArtisansChange((liveArtisans) => {
+      if (liveArtisans && liveArtisans.length > 0) {
+        setArtisans(liveArtisans);
+      }
+    });
+    return () => unsubscribe();
+  }, [refreshData]);
+
+  // Request browser GPS position
+  const requestUserLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationError('La géolocalisation n’est pas prise en charge par votre navigateur.');
+      showToast({
+        title: 'Géolocalisation indisponible',
+        desc: 'Votre navigateur ne supporte pas l’API Geolocation.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    setIsLocating(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+        setUserLocation(coords);
+        setIsLocating(false);
+        showToast({
+          title: 'Position détectée avec succès',
+          desc: `Coordonnées : ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`,
+          type: 'success',
+        });
+      },
+      (err) => {
+        setIsLocating(false);
+        // Fallback gracefully to Abidjan Plateau
+        setUserLocation(DEFAULT_COORDS);
+        const msg =
+          err.code === err.PERMISSION_DENIED
+            ? 'Autorisation refusée. Utilisation de la position par défaut (Abidjan).'
+            : 'Impossible d’obtenir votre position exacte. Position centrée sur Abidjan.';
+        setLocationError(msg);
+        showToast({
+          title: 'Position par défaut activée',
+          desc: 'Position centrée sur Abidjan pour calculer les distances.',
+          type: 'info',
+        });
+      },
+      { timeout: 8000, enableHighAccuracy: true }
+    );
+  }, [showToast]);
+
+  // Haversine formula
+  const calculateDistance = useCallback(
+    (lat: number, lng: number): number | null => {
+      const origin = userLocation || DEFAULT_COORDS;
+      if (!origin) return null;
+
+      const R = 6371; // km
+      const dLat = ((lat - origin.lat) * Math.PI) / 180;
+      const dLon = ((lng - origin.lng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((origin.lat * Math.PI) / 180) *
+          Math.cos((lat * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return Math.round(R * c * 10) / 10;
+    },
+    [userLocation]
+  );
+
+  const startChatWithArtisan = useCallback(
+    (artisanId: number) => {
+      setSelectedArtisanId(artisanId);
+      go('messages');
+    },
+    [go]
+  );
+
+  const markNotifAsRead = useCallback(async (id: string) => {
+    try {
+      await api.markNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const markAllNotifsAsRead = useCallback(async () => {
+    try {
+      await api.markAllNotificationsRead(currentUser?.id);
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [currentUser]);
+
+  const switchUser = useCallback(
+    async (user: User, shouldRedirect: boolean = true) => {
+      // Sécurité : Les emails administrateur officiel reçoivent TOUJOURS le rôle super_admin, jamais client
+      const effectiveUser: User = isExactAdminEmail(user.email)
+        ? { ...user, role: 'super_admin' }
+        : user;
+
+      setCurrentUser(effectiveUser);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('email', effectiveUser.email || '');
+        localStorage.setItem('userData', JSON.stringify(effectiveUser));
+        localStorage.setItem('artisanpro_user_id', effectiveUser.id);
+      }
+      if (effectiveUser.artisanId) {
+        const art = artisans.find((a) => a.id === effectiveUser.artisanId) || null;
+        setCurrentArtisan(art);
+      } else {
+        setCurrentArtisan(null);
+      }
+      showToast({
+        title: `Connecté en tant que ${effectiveUser.name}`,
+        desc: `Rôle : ${effectiveUser.role.toUpperCase()}`,
+        type: 'info',
+      });
+      // Refresh notifications for this user
+      const notifs = await api.getNotifications(effectiveUser.id);
+      setNotifications(notifs);
+
+      // Redirection automatique vers Accueil (feed des artisans)
+      if (shouldRedirect) {
+        go('home');
+      }
+    },
+    [artisans, go, showToast]
+  );
+
+  const updateUserProfile = useCallback(
+    async (userData: Partial<User>, artisanData?: Partial<Artisan>) => {
+      if (!currentUser) return;
+      try {
+        const updatedUser = await api.updateUser(currentUser.id, userData);
+        setCurrentUser(updatedUser);
+
+        if (currentUser.artisanId && artisanData) {
+          const updatedArt = await api.updateArtisan(currentUser.artisanId, artisanData);
+          setCurrentArtisan(updatedArt);
+          setArtisans((prev) =>
+            prev.map((a) => (a.id === currentUser.artisanId ? updatedArt : a))
+          );
+        }
+        showToast({
+          title: 'Profil mis à jour !',
+          desc: 'Vos coordonnées et liens sociaux ont été enregistrés avec succès.',
+          type: 'success',
+        });
+      } catch (err: any) {
+        showToast({
+          title: 'Erreur',
+          desc: err.message || 'Impossible de mettre à jour le profil',
+          type: 'warning',
+        });
+      }
+    },
+    [currentUser, showToast]
+  );
+
+  const logout = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('email');
+      localStorage.removeItem('userData');
+      localStorage.removeItem('artisanpro_user_id');
+    }
+    setCurrentUser(null);
+    setCurrentArtisan(null);
+    showToast({
+      title: 'Déconnexion effectuée',
+      desc: 'Session supprimée. Veuillez vous reconnecter avec Email + Code à 6 chiffres.',
+      type: 'info',
+    });
+    setPage('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [showToast]);
+
+  // Prompt 1: OTP Generation & Verification (5 min expiry)
+  const sendOtp = useCallback(
+    async (identifier: string, _type: 'inscription' | 'reconnexion' = 'inscription'): Promise<string> => {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
+      const otpData = { code, identifier, expiresAt };
+      setActiveOtp(otpData);
+
+      // Notification visible immédiate
+      showToast({
+        title: `📲 Code de validation : ${code}`,
+        desc: `Code envoyé à ${identifier} (Expire dans 5 minutes)`,
+        type: 'success',
+      });
+      return code;
+    },
+    [showToast]
+  );
+
+  const verifyOtp = useCallback(
+    (_identifier: string, code: string): boolean => {
+      if (!activeOtp) return false;
+      const isExpired = Date.now() > activeOtp.expiresAt;
+      if (isExpired) {
+        showToast({
+          title: 'Code expiré',
+          desc: 'Le code à 6 chiffres a expiré (délai de 5 minutes). Veuillez en renvoyer un nouveau.',
+          type: 'warning',
+        });
+        return false;
+      }
+      return activeOtp.code.trim() === code.trim();
+    },
+    [activeOtp, showToast]
+  );
+
+  // Prompt 4: Social Community Links
+  const updateCommunityLinks = useCallback(
+    async (links: Partial<SocialCommunityLinks>) => {
+      setCommunityLinks((prev) => {
+        const updated = { ...prev, ...links };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_community_links', JSON.stringify(updated));
+        }
+        return updated;
+      });
+      showToast({
+        title: 'Réseaux sociaux enregistrés',
+        desc: 'Les liens WhatsApp et Facebook ont été mis à jour avec succès.',
+        type: 'success',
+      });
+    },
+    [showToast]
+  );
+
+  // Prompt 5: Social Feed Publications
+  const createSocialPost = useCallback(
+    async (data: Partial<SocialPost>) => {
+      const newPost: SocialPost = {
+        id: `post-${Date.now()}`,
+        artisanId: currentArtisan?.id || (currentUser?.artisanId ?? 1),
+        artisanName: currentArtisan?.name || currentUser?.name || 'Artisan Qualifié',
+        artisanTrade: currentArtisan?.trade || 'Artisanat & Métiers',
+        artisanEmoji: currentArtisan?.emoji || '✨',
+        artisanAvatar: currentArtisan?.avatarUrl || currentUser?.avatarUrl,
+        verified: currentArtisan?.verified ?? true,
+        city: currentArtisan?.city || currentUser?.city || 'Abidjan',
+        country: currentArtisan?.country || currentUser?.country || 'Côte d’Ivoire',
+        content: data.content || '',
+        mediaType: data.mediaType || 'photo',
+        mediaUrl: data.mediaUrl,
+        price: data.price || 'Tarif sur devis',
+        priceValue: data.priceValue || 15000,
+        likesCount: 0,
+        likedBy: [],
+        viewsCount: 1,
+        comments: [],
+        sharesCount: 0,
+        createdAt: new Date().toISOString(),
+      };
+
+      setSocialPosts((prev) => {
+        const updated = [newPost, ...prev];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_social_posts', JSON.stringify(updated));
+        }
+        return updated;
+      });
+
+      showToast({
+        title: 'Publication mise en ligne !',
+        desc: 'Votre publication est visible sur le fil d’actualité Marketplace.',
+        type: 'success',
+      });
+    },
+    [currentArtisan, currentUser, showToast]
+  );
+
+  const likeSocialPost = useCallback(
+    async (postId: string) => {
+      setSocialPosts((prev) => {
+        const updated = prev.map((p) => {
+          if (p.id !== postId) return p;
+          const currentUserId = currentUser?.id || 'guest';
+          const alreadyLiked = p.likedBy.includes(currentUserId);
+          const newLikesCount = alreadyLiked ? Math.max(0, p.likesCount - 1) : p.likesCount + 1;
+          const newLikedBy = alreadyLiked
+            ? p.likedBy.filter((id) => id !== currentUserId)
+            : [...p.likedBy, currentUserId];
+          return {
+            ...p,
+            likesCount: newLikesCount,
+            likedBy: newLikedBy,
+          };
+        });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_social_posts', JSON.stringify(updated));
+        }
+        return updated;
+      });
+    },
+    [currentUser]
+  );
+
+  const addPostComment = useCallback(
+    async (postId: string, text: string) => {
+      if (!text.trim()) return;
+
+      const newComment = {
+        id: `comm-${Date.now()}`,
+        authorId: currentUser?.id || 'guest',
+        authorName: currentUser?.name || 'Client Intéressé',
+        authorRole: (currentUser?.role || 'client') as 'client' | 'artisan' | 'admin',
+        text: text.trim(),
+        createdAt: new Date().toISOString(),
+      };
+
+      let targetPost: SocialPost | undefined;
+
+      setSocialPosts((prev) => {
+        const updated = prev.map((p) => {
+          if (p.id === postId) {
+            targetPost = p;
+            return {
+              ...p,
+              comments: [...p.comments, newComment],
+            };
+          }
+          return p;
+        });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_social_posts', JSON.stringify(updated));
+        }
+        return updated;
+      });
+
+      // Prompt 5: Notification automatique envoyée à l'artisan
+      if (targetPost) {
+        const notif: AppNotification = {
+          id: `notif-comment-${Date.now()}`,
+          recipientId: `artisan-${(targetPost as any).artisanId}`,
+          title: '💬 Nouveau commentaire sur votre publication',
+          message: `${currentUser?.name || 'Un client'} a commenté votre publication : "${text.slice(0, 40)}..."`,
+          type: 'message',
+          date: new Date().toISOString(),
+          read: false,
+          linkPage: 'market',
+        };
+        setNotifications((prev) => [notif, ...prev]);
+      }
+
+      showToast({
+        title: 'Commentaire publié',
+        desc: 'L’artisan a reçu une notification de votre commentaire.',
+        type: 'success',
+      });
+    },
+    [currentUser, showToast]
+  );
+
+  // Prompt 7: Wallet & Retraits
+  const requestWithdrawal = useCallback(
+    async (data: {
+      operator: 'Orange Money' | 'MTN Mobile Money' | 'Moov Money' | 'Wave';
+      amount: number;
+      phone: string;
+      currency?: string;
+    }) => {
+      if (data.amount < 5000) {
+        throw new Error('Retrait minimum : 5 000 FCFA requis.');
+      }
+      if (data.amount > 30000) {
+        throw new Error('Retrait maximum : 30 000 FCFA par demande.');
+      }
+      if (walletBalance < data.amount) {
+        throw new Error('Solde insuffisant dans votre portefeuille.');
+      }
+
+      const newReq: WithdrawalRequest = {
+        id: `wd-${Date.now()}`,
+        userId: currentUser?.id || 'artisan-user',
+        userName: currentUser?.name || 'Artisan Partenaire',
+        userPhone: data.phone,
+        operator: data.operator,
+        amount: data.amount,
+        currency: data.currency || 'FCFA',
+        date: new Date().toISOString(),
+        status: 'en_attente',
+      };
+
+      setWithdrawals((prev) => {
+        const updated = [newReq, ...prev];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_withdrawals', JSON.stringify(updated));
+        }
+        return updated;
+      });
+
+      setWalletBalance((prev) => {
+        const updated = Math.max(0, prev - data.amount);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_wallet_balance', updated.toString());
+        }
+        return updated;
+      });
+    },
+    [currentUser, walletBalance]
+  );
+
+  const updateWithdrawalStatus = useCallback(
+    async (id: string, status: 'approuve' | 'refuse') => {
+      setWithdrawals((prev) => {
+        const updated = prev.map((w) => (w.id === id ? { ...w, status } : w));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_withdrawals', JSON.stringify(updated));
+        }
+        return updated;
+      });
+      showToast({
+        title: status === 'approuve' ? 'Retrait validé & Payé !' : 'Demande de retrait refusée',
+        desc: `La demande a été mise à jour (${status === 'approuve' ? 'Payé' : 'Refusé'}).`,
+        type: status === 'approuve' ? 'success' : 'info',
+      });
+    },
+    [showToast]
+  );
+
+  const approveWithdrawal = useCallback(
+    async (id: string) => {
+      setWithdrawals((prev) => {
+        const updated = prev.map((w) => (w.id === id ? { ...w, status: 'approuve' as const } : w));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_withdrawals', JSON.stringify(updated));
+        }
+        return updated;
+      });
+      showToast({
+        title: 'Retrait validé & Payé !',
+        desc: 'Le retrait Mobile Money a été approuvé et le statut est désormais "Payé".',
+        type: 'success',
+      });
+    },
+    [showToast]
+  );
+
+  const rejectWithdrawal = useCallback(
+    async (id: string) => {
+      setWithdrawals((prev) => {
+        const target = prev.find((w) => w.id === id);
+        if (target && target.status !== 'refuse') {
+          // Re-credit wallet
+          setWalletBalance((b) => {
+            const refunded = b + target.amount;
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('artisanpro_wallet_balance', refunded.toString());
+            }
+            return refunded;
+          });
+        }
+        const updated = prev.map((w) => (w.id === id ? { ...w, status: 'refuse' as const } : w));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_withdrawals', JSON.stringify(updated));
+        }
+        return updated;
+      });
+      showToast({
+        title: 'Demande de retrait refusée',
+        desc: 'Le montant a été recrédité sur le portefeuille de l’artisan.',
+        type: 'info',
+      });
+    },
+    [showToast]
+  );
+
+  const creditArtisanWallet = useCallback(
+    (amount: number, description?: string) => {
+      setWalletBalance((prev) => {
+        const updated = prev + amount;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_wallet_balance', updated.toString());
+        }
+        return updated;
+      });
+      showToast({
+        title: 'Solde crédité !',
+        desc: description || `Votre portefeuille a été crédité de ${amount.toLocaleString('fr-FR')} FCFA.`,
+        type: 'success',
+      });
+    },
+    [showToast]
+  );
+
+  const toggleFollowArtisan = useCallback(
+    (artisanId: number) => {
+      setFollowingArtisans((prev) => {
+        const isFollowing = prev.includes(artisanId);
+        const updated = isFollowing ? prev.filter((id) => id !== artisanId) : [...prev, artisanId];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('artisanpro_following', JSON.stringify(updated));
+        }
+        showToast({
+          title: isFollowing ? 'Désabonné' : 'Abonnement réussi !',
+          desc: isFollowing
+            ? 'Vous ne suivez plus cet artisan.'
+            : 'Vous suivez désormais cet artisan. Vous serez alerté de ses nouvelles réalisations.',
+          type: isFollowing ? 'info' : 'success',
+        });
+        return updated;
+      });
+    },
+    [showToast]
+  );
+
+  const deleteUser = useCallback(
+    async (userId: string) => {
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      try {
+        await api.deleteUser(userId);
+      } catch (err) {
+        console.warn('Error deleting user:', err);
+      }
+      showToast({
+        title: 'Utilisateur supprimé',
+        desc: 'Le compte a été retiré de la plateforme avec succès.',
+        type: 'info',
+      });
+    },
+    [showToast]
+  );
+
+  const deleteArtisan = useCallback(
+    async (artisanId: number) => {
+      setArtisans((prev) => prev.filter((a) => a.id !== artisanId));
+      try {
+        await api.deleteArtisan(artisanId);
+      } catch (err) {
+        console.warn('Error deleting artisan:', err);
+      }
+      showToast({
+        title: 'Artisan supprimé',
+        desc: 'Le profil artisan a été supprimé de la plateforme.',
+        type: 'info',
+      });
+    },
+    [showToast]
+  );
+
+  const selectedArtisan = selectedArtisanId
+    ? artisans.find((a) => a.id === selectedArtisanId) || null
+    : null;
+
+  const unreadNotifsCount = notifications.filter((n) => !n.read).length;
+
+  return (
+    <AppContext.Provider
+      value={{
+        page,
+        go,
+        currentUser,
+        currentArtisan,
+        artisans,
+        plans,
+        services,
+        selectedArtisanId,
+        setSelectedArtisanId,
+        selectedArtisan,
+        notifications,
+        unreadNotifsCount,
+        markNotifAsRead,
+        markAllNotifsAsRead,
+        userLocation,
+        locationError,
+        isLocating,
+        requestUserLocation,
+        calculateDistance,
+        searchQuery,
+        setSearchQuery,
+        selectedTrade,
+        setSelectedTrade,
+        selectedCity,
+        setSelectedCity,
+        toast,
+        showToast,
+        socialPosts,
+        createSocialPost,
+        likeSocialPost,
+        addPostComment,
+        communityLinks,
+        updateCommunityLinks,
+        walletBalance,
+        creditArtisanWallet,
+        withdrawals,
+        requestWithdrawal,
+        updateWithdrawalStatus,
+        approveWithdrawal,
+        rejectWithdrawal,
+        users,
+        deleteUser,
+        deleteArtisan,
+        followingArtisans,
+        toggleFollowArtisan,
+        activeOtp,
+        sendOtp,
+        verifyOtp,
+        quoteModal: {
+          isOpen: quoteModalOpen,
+          artisan: quoteTargetArtisan,
+          serviceTitle: quoteServiceTitle,
+          open: (artisan, sTitle) => {
+            setQuoteTargetArtisan(artisan);
+            setQuoteServiceTitle(sTitle);
+            setQuoteModalOpen(true);
+          },
+          close: () => setQuoteModalOpen(false),
+        },
+        paymentModal: {
+          isOpen: paymentModalOpen,
+          plan: paymentPlan,
+          service: paymentService,
+          customTitle: paymentCustomTitle,
+          customAmount: paymentCustomAmount,
+          open: (planOrConfig) => {
+            if (typeof planOrConfig === 'string') {
+              setPaymentPlan(planOrConfig);
+              setPaymentService(undefined);
+              setPaymentCustomTitle(undefined);
+              setPaymentCustomAmount(undefined);
+            } else if (planOrConfig && typeof planOrConfig === 'object') {
+              if (planOrConfig.plan) setPaymentPlan(planOrConfig.plan);
+              setPaymentService(planOrConfig.service);
+              setPaymentCustomTitle(planOrConfig.customTitle);
+              setPaymentCustomAmount(planOrConfig.customAmount);
+            }
+            setPaymentModalOpen(true);
+          },
+          close: () => {
+            setPaymentModalOpen(false);
+            setPaymentService(undefined);
+            setPaymentCustomTitle(undefined);
+            setPaymentCustomAmount(undefined);
+          },
+        },
+        supportModal: {
+          isOpen: supportModalOpen,
+          initialTopic: supportTopic,
+          open: (topic) => {
+            setSupportTopic(topic);
+            setSupportModalOpen(true);
+          },
+          close: () => {
+            setSupportModalOpen(false);
+            setSupportTopic(undefined);
+          },
+        },
+        authModal: {
+          isOpen: authModalOpen,
+          initialTab: authModalTab,
+          open: (tab = 'login') => {
+            setAuthModalTab(tab === 'register' ? 'register' : 'login');
+            setAuthModalOpen(true);
+          },
+          close: () => setAuthModalOpen(false),
+        },
+        refreshData,
+        switchUser,
+        updateUserProfile,
+        logout,
+        startChatWithArtisan,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};

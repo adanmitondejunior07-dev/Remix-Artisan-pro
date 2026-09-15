@@ -1,0 +1,12 @@
+{
+  "name": "ArtisanPro Afrique",
+  "description": "Plateforme professionnelle pour trouver des artisans qualifiés en Afrique de l\u0027Ouest, avec géolocalisation, messagerie en direct, marketplace de services, paiements d\u0027abonnements et espace d\u0027administration.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

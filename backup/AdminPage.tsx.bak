@@ -1,0 +1,1748 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Shield,
+  Users,
+  Briefcase,
+  DollarSign,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Bell,
+  Trash2,
+  Sparkles,
+  ArrowUpRight,
+  TrendingUp,
+  Clock,
+  XCircle,
+  Phone,
+  Smartphone,
+  Check,
+  X,
+  Search,
+  MessageCircle,
+  Facebook,
+  Instagram,
+  Globe,
+  Copy,
+  ExternalLink,
+  Send,
+  Mail,
+  PhoneCall,
+  Video,
+  ShieldAlert,
+  Printer,
+  Download,
+  UserX,
+  UserCheck,
+  Lock,
+} from 'lucide-react';
+import { useApp } from '../context/AppContext.tsx';
+import { api } from '../services/api.ts';
+import type { AdminStats, PaymentTransaction, Artisan, User, WithdrawalRequest } from '../types.ts';
+import { isSuperAdmin } from '../config/adminConfig.ts';
+
+export const AdminPage: React.FC = () => {
+  const {
+    currentUser,
+    go,
+    artisans,
+    users,
+    deleteUser,
+    deleteArtisan,
+    withdrawals,
+    approveWithdrawal,
+    rejectWithdrawal,
+    refreshData,
+    showToast,
+  } = useApp();
+
+  // SÉCURITÉ : Vérifier côté client et logique que seul super_admin peut accéder
+  useEffect(() => {
+    if (!isSuperAdmin(currentUser)) {
+      go('home');
+      showToast({
+        title: 'Accès non autorisé',
+        desc: 'Vous devez être connecté en tant que super administrateur.',
+        type: 'warning',
+      });
+    }
+  }, [currentUser]);
+
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [payments, setPayments] = useState<PaymentTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adminTab, setAdminTab] = useState<
+    'withdrawals' | 'artisans' | 'clients' | 'announcements' | 'business_links' | 'permissions'
+  >('withdrawals');
+
+  // Gestion des bannissements de compte
+  const [bannedUserIds, setBannedUserIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('artisan_pro_banned_users');
+      return saved ? JSON.parse(saved) : ['user-mock-fraud-1'];
+    } catch {
+      return ['user-mock-fraud-1'];
+    }
+  });
+  const [showBanModal, setShowBanModal] = useState(false);
+  const [banModalTab, setBanModalTab] = useState<'all' | 'banned'>('all');
+  const [banSearchQuery, setBanSearchQuery] = useState('');
+
+  const toggleBanUser = (id: string, name: string) => {
+    setBannedUserIds((prev) => {
+      let updated: string[];
+      if (prev.includes(id)) {
+        updated = prev.filter((item) => item !== id);
+        showToast({
+          title: 'Compte débanni 🟢',
+          desc: `${name} peut à nouveau utiliser tous les services.`,
+          type: 'success',
+        });
+      } else {
+        updated = [...prev, id];
+        showToast({
+          title: 'Compte banni 🔴',
+          desc: `${name} a été suspendu de la plateforme.`,
+          type: 'warning',
+        });
+      }
+      try {
+        localStorage.setItem('artisan_pro_banned_users', JSON.stringify(updated));
+      } catch (err) {
+        console.error(err);
+      }
+      return updated;
+    });
+  };
+
+  const handleOpenWithdrawalsDashboard = () => {
+    setAdminTab('withdrawals');
+    const el = document.getElementById('mobile-money-withdrawals-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Search filter
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Selected withdrawal for payment proof modal
+  const [selectedProofWithdrawal, setSelectedProofWithdrawal] = useState<WithdrawalRequest | null>(null);
+
+  // Admin Permissions state with toggles
+  const [adminPermissions, setAdminPermissions] = useState({
+    allowVoip: true,
+    allowScreenShare: true,
+    allowViewAllProfiles: true,
+    allowDeleteAccount: true,
+    allowTechSupportMode: true,
+  });
+
+  // Business links inputs for Admin / Platform
+  const [businessLinks, setBusinessLinks] = useState({
+    whatsappChannel: 'https://whatsapp.com/channel/0029Vb3artisanpro',
+    facebookPage: 'https://facebook.com/artisanproafrique',
+    instagramTiktok: 'https://instagram.com/artisanpro.afrique',
+    website: 'https://artisanpro.africa',
+  });
+  const [linkErrors, setLinkErrors] = useState<{ [k: string]: string }>({});
+
+  // Group message to all artisans
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupMessage, setGroupMessage] = useState('');
+  const [isSendingGroup, setIsSendingGroup] = useState(false);
+
+  // Broadcast notification state
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifMessage, setNotifMessage] = useState('');
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  const pendingWithdrawalsCount = withdrawals.filter((w) => w.status === 'en_attente').length;
+
+  const loadAdminData = async () => {
+    setLoading(true);
+    try {
+      const [st, payList] = await Promise.all([api.getAdminStats(), api.getPayments()]);
+      setStats(st);
+      setPayments(payList);
+    } catch (err: any) {
+      console.error('Error fetching admin data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAdminData();
+  }, []);
+
+  const handleToggleVerification = async (artisan: Artisan) => {
+    try {
+      await api.updateArtisan(artisan.id, { verified: !artisan.verified });
+      await refreshData();
+      await loadAdminData();
+      showToast({
+        title: !artisan.verified ? 'Profil vérifié avec succès' : 'Vérification retirée',
+        type: 'success',
+      });
+    } catch (err: any) {
+      showToast({ title: 'Erreur', desc: err.message, type: 'warning' });
+    }
+  };
+
+  const handleBroadcastNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifTitle.trim() || !notifMessage.trim()) return;
+
+    setIsBroadcasting(true);
+    try {
+      await api.sendNotification({
+        title: notifTitle.trim(),
+        message: notifMessage.trim(),
+        type: 'system',
+        linkPage: 'market',
+      });
+      await refreshData();
+      setNotifTitle('');
+      setNotifMessage('');
+      showToast({
+        title: 'Notification globale diffusée !',
+        desc: 'Tous les clients et artisans ont reçu l’alerte.',
+        type: 'success',
+      });
+    } catch (err: any) {
+      showToast({ title: 'Erreur', desc: err.message, type: 'warning' });
+    } finally {
+      setIsBroadcasting(false);
+    }
+  };
+
+  // Filter lists based on search
+  const filteredArtisans = artisans.filter(
+    (a) =>
+      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.trade.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.city.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const clientUsers = users.filter((u) => u.role !== 'admin');
+  const filteredClients = clientUsers.filter(
+    (u) =>
+      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.city.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-neutral-200 shadow-xs">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-black uppercase tracking-wider">
+            <Shield className="w-3.5 h-3.5" />
+            <span>Super Administration (admin@artisanpro.africa)</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-neutral-950">Tableau de bord Admin</h1>
+          <p className="text-xs sm:text-sm text-neutral-600">
+            Gestion complète des artisans, clients, retraits Mobile Money et modération de la plateforme.
+          </p>
+        </div>
+
+        <button
+          onClick={() => {
+            refreshData();
+            loadAdminData();
+            showToast({ title: 'Données actualisées', type: 'info' });
+          }}
+          className="px-4 py-2.5 rounded-2xl border border-neutral-300 hover:bg-neutral-50 text-xs font-bold text-neutral-700 flex items-center gap-2 self-start cursor-pointer shadow-xs"
+        >
+          <span>Actualiser les données</span>
+        </button>
+      </div>
+
+      {/* Quick KPI Stats Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-neutral-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-neutral-400">Demandes de Retrait</span>
+            <div className="w-8 h-8 rounded-lg bg-orange-50 text-[#FF6B00] flex items-center justify-center">
+              <Smartphone className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-neutral-900">{withdrawals.length}</div>
+          <div className="text-xs text-amber-700 font-bold flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            <span>{pendingWithdrawalsCount} en attente</span>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-neutral-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-neutral-400">Total Artisans</span>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Briefcase className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-neutral-900">{artisans.length}</div>
+          <div className="text-xs text-emerald-700 font-semibold">Profils professionnels</div>
+        </div>
+
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-neutral-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-neutral-400">Clients & Utilisateurs</span>
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-neutral-900">{users.length}</div>
+          <div className="text-xs text-neutral-500">Comptes enregistrés</div>
+        </div>
+
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-neutral-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-neutral-400">Règle Gains</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-emerald-600">90% / 10%</div>
+          <div className="text-xs text-neutral-500">Min. retrait 5 000 FCFA</div>
+        </div>
+      </div>
+
+      {/* =========================================================
+          SECTION ADMINISTRATEUR & PERMISSIONS - FOND NOIR BORDURE ROUGE
+          ========================================================= */}
+      <div className="bg-neutral-950 border-2 border-red-500 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-red-950/40 space-y-6 text-white">
+        {/* EN-TÊTE ADMIN */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-red-500/30">
+          <div className="flex items-center gap-4">
+            {/* Icône bouclier rouge */}
+            <div className="w-14 h-14 rounded-2xl bg-red-600/20 text-red-500 border-2 border-red-500 flex items-center justify-center shrink-0 shadow-lg shadow-red-600/20">
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1.5">
+              {/* En haut : Grand badge rouge [ADMINISTRATEUR] + badge bleu [Vérifié] */}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="px-4 py-1.5 rounded-full bg-red-600 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-red-600/40 ring-2 ring-red-400 animate-pulse">
+                  ADMINISTRATEUR
+                </span>
+                <span className="px-3 py-1.5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Vérifié</span>
+                </span>
+                <span className="text-xs text-neutral-400 font-mono hidden md:inline">
+                  {currentUser?.email || 'admin@artisanpro.afrique'}
+                </span>
+              </div>
+
+              {/* Titre : "Administrateur & Permissions" */}
+              <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+                <span>Administrateur & Permissions</span>
+              </h2>
+            </div>
+          </div>
+
+          {/* Bouton orange [Ouvrir Tableau de bord Retraits Mobile Money] */}
+          <button
+            type="button"
+            onClick={handleOpenWithdrawalsDashboard}
+            className="px-5 py-3 rounded-2xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs sm:text-sm font-black transition-all shadow-xl shadow-orange-600/30 flex items-center gap-2 cursor-pointer whitespace-nowrap self-start sm:self-auto group"
+          >
+            <DollarSign className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            <span>Ouvrir Tableau de bord Retraits Mobile Money</span>
+          </button>
+        </div>
+
+        {/* BANDEAU : "Section réservée exclusivement aux administrateurs certifiés" */}
+        <div className="p-4 rounded-2xl bg-red-950/60 border border-red-500/50 flex items-center gap-3 text-red-200">
+          <Shield className="w-5 h-5 text-red-400 shrink-0" />
+          <div className="text-xs">
+            <span className="font-black text-red-400">Accès Haute Sécurité : </span>
+            <span>Section réservée exclusivement aux administrateurs certifiés de la plateforme.</span>
+          </div>
+        </div>
+
+        {/* ACTIONS DE MODÉRATION COMPTES : [🔴 Bannir un compte] & [🟢 Autoriser / Débannir un compte] */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-black uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+              <UserX className="w-4 h-4 text-red-400" />
+              <span>Actions de Modération Comptes :</span>
+            </h3>
+            <span className="text-[11px] font-mono text-neutral-400">
+              {bannedUserIds.length} compte(s) banni(s)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Bouton 1 : [🔴 Bannir un compte] */}
+            <button
+              type="button"
+              onClick={() => {
+                setBanModalTab('all');
+                setShowBanModal(true);
+              }}
+              className="p-4 rounded-2xl bg-red-950/40 hover:bg-red-950/70 border-2 border-red-500/60 hover:border-red-500 transition-all flex items-center justify-between group cursor-pointer text-left shadow-lg"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-600/30 text-red-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <UserX className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-black text-red-400">
+                    🔴 Bannir un compte
+                  </div>
+                  <div className="text-[11px] text-neutral-400">
+                    Rechercher et suspendre un compte fraudeur
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs font-black text-white bg-red-600 px-3 py-1 rounded-lg">
+                Ouvrir
+              </span>
+            </button>
+
+            {/* Bouton 2 : [🟢 Autoriser / Débannir un compte] */}
+            <button
+              type="button"
+              onClick={() => {
+                setBanModalTab('banned');
+                setShowBanModal(true);
+              }}
+              className="p-4 rounded-2xl bg-emerald-950/40 hover:bg-emerald-950/70 border-2 border-emerald-500/60 hover:border-emerald-500 transition-all flex items-center justify-between group cursor-pointer text-left shadow-lg"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600/30 text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-black text-emerald-400">
+                    🟢 Autoriser / Débannir un compte
+                  </div>
+                  <div className="text-[11px] text-neutral-400">
+                    Réactiver et lever la suspension d'un compte
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs font-black text-white bg-emerald-600 px-3 py-1 rounded-lg">
+                Gérer ({bannedUserIds.length})
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* 5 TOGGLES DE PERMISSIONS ACTIFS */}
+        <div className="space-y-3 pt-2">
+          <h3 className="text-xs font-black uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-blue-400" />
+            <span>Permissions & Privilèges Système (Toggles Actifs) :</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* 1. VoIP */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <PhoneCall className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Autoriser appel VoIP</div>
+                  <div className="text-[10px] text-neutral-400">Appels vocaux & vidéo WebRTC chiffrés</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminPermissions((p) => ({ ...p, allowVoip: !p.allowVoip }))}
+                className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                  adminPermissions.allowVoip ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+              </button>
+            </div>
+
+            {/* 2. Écran */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <Video className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Autoriser partage d'écran</div>
+                  <div className="text-[10px] text-neutral-400">Démonstration visuelle en direct</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminPermissions((p) => ({ ...p, allowScreenShare: !p.allowScreenShare }))}
+                className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                  adminPermissions.allowScreenShare ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+              </button>
+            </div>
+
+            {/* 3. Voir tous profils */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Autoriser à voir tous les profils</div>
+                  <div className="text-[10px] text-neutral-400">Accès annuaire complet clients & artisans</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminPermissions((p) => ({ ...p, allowViewAllProfiles: !p.allowViewAllProfiles }))}
+                className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                  adminPermissions.allowViewAllProfiles ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+              </button>
+            </div>
+
+            {/* 4. Supprimer compte */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Autoriser suppression de compte</div>
+                  <div className="text-[10px] text-neutral-400">Modération stricte & sanctions profils</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminPermissions((p) => ({ ...p, allowDeleteAccount: !p.allowDeleteAccount }))}
+                className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                  adminPermissions.allowDeleteAccount ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+              </button>
+            </div>
+
+            {/* 5. Support */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors md:col-span-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Autoriser mode support technique</div>
+                  <div className="text-[10px] text-neutral-400">Hotline d’assistance prioritaire en direct</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminPermissions((p) => ({ ...p, allowTechSupportMode: !p.allowTechSupportMode }))}
+                className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                  adminPermissions.allowTechSupportMode ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Tabs for Admin Sections */}
+      <div className="flex items-center gap-2 border-b border-neutral-200 pb-1 overflow-x-auto">
+        <button
+          onClick={() => setAdminTab('withdrawals')}
+          className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'withdrawals'
+              ? 'bg-[#FF6B00] text-white shadow-xs'
+              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+          }`}
+        >
+          <Smartphone className="w-4 h-4" />
+          <span>Demandes de Retrait ({withdrawals.length})</span>
+          {pendingWithdrawalsCount > 0 && (
+            <span className="px-1.5 py-0.5 text-[10px] bg-red-600 text-white rounded-full font-black">
+              {pendingWithdrawalsCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setAdminTab('artisans')}
+          className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'artisans'
+              ? 'bg-[#FF6B00] text-white shadow-xs'
+              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+          }`}
+        >
+          <Briefcase className="w-4 h-4" />
+          <span>Artisans ({artisans.length})</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('clients')}
+          className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'clients'
+              ? 'bg-[#FF6B00] text-white shadow-xs'
+              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Clients & Utilisateurs ({users.length})</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('announcements')}
+          className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'announcements'
+              ? 'bg-[#FF6B00] text-white shadow-xs'
+              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+          }`}
+        >
+          <Bell className="w-4 h-4" />
+          <span>Diffuser Notification</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('business_links')}
+          className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'business_links'
+              ? 'bg-[#FF6B00] text-white shadow-xs'
+              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+          }`}
+        >
+          <Globe className="w-4 h-4 text-emerald-500" />
+          <span>Mes Liens Business</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('permissions')}
+          className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'permissions'
+              ? 'bg-red-600 text-white shadow-xs'
+              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-red-500" />
+          <span>Permissions & Contacts Admin</span>
+        </button>
+      </div>
+
+      {/* SECTION 1: WITHDRAWALS MANAGEMENT */}
+      {adminTab === 'withdrawals' && (
+        <div id="mobile-money-withdrawals-section" className="bg-white rounded-3xl border border-neutral-200 p-6 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-neutral-900">Demandes de Retrait Mobile Money</h2>
+              <p className="text-xs text-neutral-500">
+                Approuvez les retraits pour soustraire le solde et marquer comme "Payé", ou refusez pour rembourser.
+              </p>
+            </div>
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 self-start">
+              {pendingWithdrawalsCount} demande(s) en attente de paiement
+            </span>
+          </div>
+
+          {withdrawals.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-neutral-200 rounded-3xl space-y-2">
+              <Smartphone className="w-10 h-10 text-neutral-300 mx-auto" />
+              <p className="font-bold text-sm text-neutral-700">Aucune demande de retrait</p>
+              <p className="text-xs text-neutral-500">
+                Les demandes de retrait Mobile Money soumises par les artisans apparaîtront ici.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-neutral-700">
+                <thead className="bg-neutral-50 text-[11px] font-bold uppercase text-neutral-400 border-y border-neutral-100">
+                  <tr>
+                    <th className="py-3 px-4">Artisan & Contact</th>
+                    <th className="py-3 px-4">Moyen de Retrait</th>
+                    <th className="py-3 px-4">Montant</th>
+                    <th className="py-3 px-4">Date de demande</th>
+                    <th className="py-3 px-4">Statut</th>
+                    <th className="py-3 px-4 text-right">Actions Admin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {withdrawals.map((w) => {
+                    const isPending = w.status === 'en_attente';
+                    const isApproved = w.status === 'approuve';
+                    const isRejected = w.status === 'refuse';
+
+                    return (
+                      <tr key={w.id} className="hover:bg-neutral-50/60 transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-neutral-900">
+                          <div>{w.userName}</div>
+                          <div className="text-[11px] text-neutral-500 font-mono font-normal flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3 text-neutral-400" />
+                            <span>{w.userPhone}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-800">
+                            <Smartphone className="w-3 h-3 text-[#FF6B00]" />
+                            <span>{w.operator}</span>
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-extrabold text-sm text-neutral-950">
+                          {w.amount.toLocaleString()} FCFA
+                        </td>
+                        <td className="py-3.5 px-4 text-neutral-500">
+                          {new Date(w.date).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {isApproved ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-800 bg-emerald-100/90 px-2.5 py-1 rounded-full border border-emerald-300">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Payé</span>
+                            </span>
+                          ) : isRejected ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 px-2.5 py-1 rounded-full border border-red-200">
+                              <XCircle className="w-3.5 h-3.5 text-red-500" />
+                              <span>Refusé (Remboursé)</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300 animate-pulse">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>En attente</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {/* // BOUTON VOIR PREUVE DE PAIEMENT CONSERVÉ */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProofWithdrawal(w)}
+                              className="px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs flex items-center gap-1 border border-sky-200 transition-colors cursor-pointer"
+                              title="Consulter la preuve de transaction Mobile Money"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-sky-600" />
+                              <span className="hidden sm:inline">Voir preuve</span>
+                            </button>
+
+                            {isPending ? (
+                              <>
+                                {/* // BOUTON RETRAIT CONSERVÉ */}
+                                <button
+                                  type="button"
+                                  onClick={() => approveWithdrawal(w.id)}
+                                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                                  title="Valider le transfert Mobile Money et passer en Payé"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Approuver le retrait</span>
+                                </button>
+                                {/* // BOUTON REFUS RETRAIT CONSERVÉ */}
+                                <button
+                                  type="button"
+                                  onClick={() => rejectWithdrawal(w.id)}
+                                  className="px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-red-50 text-neutral-600 hover:text-red-700 font-bold text-xs flex items-center gap-1 border border-neutral-200 transition-colors cursor-pointer"
+                                  title="Refuser la demande et restituer le solde"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Refuser le retrait</span>
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-neutral-400 italic">Traité</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SECTION 2: ARTISANS MANAGEMENT */}
+      {adminTab === 'artisans' && (
+        <div className="bg-white rounded-3xl border border-neutral-200 p-6 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-neutral-900">Liste de tous les Artisans</h2>
+              <p className="text-xs text-neutral-500">
+                Consultez, modifiez le statut vérifié ou supprimez définitivement un profil d'artisan.
+              </p>
+            </div>
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Rechercher un artisan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:border-[#FF6B00]"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-neutral-700">
+              <thead className="bg-neutral-50 text-[11px] font-bold uppercase text-neutral-400 border-y border-neutral-100">
+                <tr>
+                  <th className="py-3 px-4">Artisan</th>
+                  <th className="py-3 px-4">Métier & Ville</th>
+                  <th className="py-3 px-4">Contact</th>
+                  <th className="py-3 px-4">Statut Vérifié</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {filteredArtisans.map((artisan) => (
+                  <tr key={artisan.id} className="hover:bg-neutral-50/60 transition-colors">
+                    <td className="py-3 px-4 font-bold text-neutral-900 flex items-center gap-2.5">
+                      <span className="text-xl">{artisan.emoji}</span>
+                      <div>
+                        <div>{artisan.name}</div>
+                        <div className="text-[10px] text-neutral-400 font-normal">ID: {artisan.id}</div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-neutral-800">{artisan.trade}</div>
+                      <div className="text-[11px] text-neutral-400">{artisan.city}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-mono text-neutral-700">{artisan.phone}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => handleToggleVerification(artisan)}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                          artisan.verified
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-neutral-100 text-neutral-500 border border-neutral-200'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{artisan.verified ? 'Vérifié' : 'Non vérifié'}</span>
+                      </button>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Supprimer définitivement l'artisan ${artisan.name} ?`)) {
+                            await deleteArtisan(artisan.id);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs inline-flex items-center gap-1 border border-red-200 transition-colors cursor-pointer"
+                        title="Supprimer l'artisan"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Supprimer</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 3: CLIENTS / USERS MANAGEMENT */}
+      {adminTab === 'clients' && (
+        <div className="bg-white rounded-3xl border border-neutral-200 p-6 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-neutral-900">Liste de tous les Clients & Utilisateurs</h2>
+              <p className="text-xs text-neutral-500">
+                Consultez tous les comptes clients inscrits et supprimez les comptes indésirables en un clic.
+              </p>
+            </div>
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Rechercher un client..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:border-[#FF6B00]"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-neutral-700">
+              <thead className="bg-neutral-50 text-[11px] font-bold uppercase text-neutral-400 border-y border-neutral-100">
+                <tr>
+                  <th className="py-3 px-4">Nom</th>
+                  <th className="py-3 px-4">Email</th>
+                  <th className="py-3 px-4">Téléphone</th>
+                  <th className="py-3 px-4">Rôle</th>
+                  <th className="py-3 px-4">Ville</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {filteredClients.map((u) => (
+                  <tr key={u.id} className="hover:bg-neutral-50/60 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-neutral-900">
+                      <div>{u.name}</div>
+                      <div className="text-[10px] text-neutral-400 font-mono">ID: {u.id}</div>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-neutral-600">{u.email}</td>
+                    <td className="py-3.5 px-4 font-mono text-neutral-600">{u.phone}</td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 capitalize">
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-neutral-600">{u.city}</td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Supprimer l'utilisateur ${u.name} (${u.email}) ?`)) {
+                            await deleteUser(u.id);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs inline-flex items-center gap-1 border border-red-200 transition-colors cursor-pointer"
+                        title="Supprimer l'utilisateur"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Supprimer</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 4: ANNOUNCEMENTS */}
+      {adminTab === 'announcements' && (
+        <div className="bg-white rounded-3xl border border-neutral-200 p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-[#FF6B00]" />
+            <div>
+              <h2 className="text-base font-bold text-neutral-900">Diffuser une annonce générale</h2>
+              <p className="text-xs text-neutral-500">Envoyez une alerte directe à tous les artisans et clients.</p>
+            </div>
+          </div>
+          <form onSubmit={handleBroadcastNotification} className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+            <input
+              type="text"
+              required
+              placeholder="Titre (ex: Nouvelle mise à jour Marketplace)"
+              value={notifTitle}
+              onChange={(e) => setNotifTitle(e.target.value)}
+              className="px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:border-[#FF6B00]"
+            />
+            <input
+              type="text"
+              required
+              placeholder="Message complet de la notification..."
+              value={notifMessage}
+              onChange={(e) => setNotifMessage(e.target.value)}
+              className="px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:border-[#FF6B00]"
+            />
+            <button
+              type="submit"
+              disabled={isBroadcasting}
+              className="px-5 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>{isBroadcasting ? 'Envoi en cours...' : 'Envoyer à tous les utilisateurs'}</span>
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* SECTION 5: MES LIENS BUSINESS (Prompt Spécifique Profil & Admin) */}
+      {adminTab === 'business_links' && (
+        <div className="bg-neutral-900 text-white rounded-3xl border border-neutral-800 p-6 sm:p-8 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30">
+                <Globe className="w-3.5 h-3.5" />
+                <span>Mes Liens Business & Canaux Sociaux</span>
+              </div>
+              <h2 className="text-xl font-black text-white">Canaux Officiels & Liens Professionnels</h2>
+              <p className="text-xs text-neutral-400">
+                Configurez vos liens officiels WhatsApp, Facebook, Instagram et Site Web. Validation HTTPS requise.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                showToast({
+                  title: 'Liens business enregistrés !',
+                  desc: 'Vos canaux officiels ont été synchronisés avec succès.',
+                  type: 'success',
+                });
+              }}
+              className="px-5 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold text-xs shadow-md transition-all self-start sm:self-auto cursor-pointer"
+            >
+              Enregistrer les Liens
+            </button>
+          </div>
+
+          {/* Business Links Form */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* 1. WhatsApp Channel */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-neutral-300 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                </span>
+                <span>Lien Chaîne WhatsApp</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="url"
+                  placeholder="https://whatsapp.com/channel/..."
+                  value={businessLinks.whatsappChannel}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBusinessLinks((prev) => ({ ...prev, whatsappChannel: val }));
+                    if (val && !val.startsWith('https://')) {
+                      setLinkErrors((prev) => ({ ...prev, whatsapp: 'Le lien WhatsApp doit commencer par https://' }));
+                    } else {
+                      setLinkErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.whatsapp;
+                        return copy;
+                      });
+                    }
+                  }}
+                  className={`flex-1 px-3.5 py-2.5 rounded-xl bg-neutral-800 text-white text-xs border ${
+                    linkErrors.whatsapp ? 'border-red-500' : 'border-neutral-700'
+                  } focus:outline-none focus:border-emerald-500 font-mono`}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      setBusinessLinks((prev) => ({ ...prev, whatsappChannel: text }));
+                      showToast({ title: 'Lien collé !', type: 'info' });
+                    } catch (e) {
+                      showToast({ title: 'Impossible d’accéder au presse-papier', type: 'warning' });
+                    }
+                  }}
+                  className="px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Coller</span>
+                </button>
+              </div>
+              {linkErrors.whatsapp && (
+                <p className="text-[11px] text-red-400 font-medium">{linkErrors.whatsapp}</p>
+              )}
+            </div>
+
+            {/* 2. Facebook Page */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-neutral-300 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <Facebook className="w-3.5 h-3.5 text-blue-400" />
+                </span>
+                <span>Lien Page Facebook</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="url"
+                  placeholder="https://facebook.com/..."
+                  value={businessLinks.facebookPage}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBusinessLinks((prev) => ({ ...prev, facebookPage: val }));
+                    if (val && !val.startsWith('https://')) {
+                      setLinkErrors((prev) => ({ ...prev, facebook: 'Le lien Facebook doit commencer par https://' }));
+                    } else {
+                      setLinkErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.facebook;
+                        return copy;
+                      });
+                    }
+                  }}
+                  className={`flex-1 px-3.5 py-2.5 rounded-xl bg-neutral-800 text-white text-xs border ${
+                    linkErrors.facebook ? 'border-red-500' : 'border-neutral-700'
+                  } focus:outline-none focus:border-blue-500 font-mono`}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      setBusinessLinks((prev) => ({ ...prev, facebookPage: text }));
+                      showToast({ title: 'Lien collé !', type: 'info' });
+                    } catch (e) {
+                      showToast({ title: 'Impossible d’accéder au presse-papier', type: 'warning' });
+                    }
+                  }}
+                  className="px-3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Coller</span>
+                </button>
+              </div>
+              {linkErrors.facebook && (
+                <p className="text-[11px] text-red-400 font-medium">{linkErrors.facebook}</p>
+              )}
+            </div>
+
+            {/* 3. Instagram / TikTok */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-neutral-300 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-pink-500/20 text-pink-400 flex items-center justify-center">
+                  <Instagram className="w-3.5 h-3.5 text-pink-400" />
+                </span>
+                <span>Lien Instagram / TikTok</span>
+              </label>
+              <input
+                type="url"
+                placeholder="https://instagram.com/... ou https://tiktok.com/@..."
+                value={businessLinks.instagramTiktok}
+                onChange={(e) => setBusinessLinks((prev) => ({ ...prev, instagramTiktok: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-800 text-white text-xs border border-neutral-700 focus:outline-none focus:border-pink-500 font-mono"
+              />
+            </div>
+
+            {/* 4. Site Web */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-neutral-300 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center">
+                  <Globe className="w-3.5 h-3.5 text-sky-400" />
+                </span>
+                <span>Lien Site Web</span>
+              </label>
+              <input
+                type="url"
+                placeholder="https://monsiteweb.com"
+                value={businessLinks.website}
+                onChange={(e) => setBusinessLinks((prev) => ({ ...prev, website: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-800 text-white text-xs border border-neutral-700 focus:outline-none focus:border-sky-500 font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Live Visitor Buttons Preview */}
+          <div className="pt-4 border-t border-neutral-800 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+              Aperçu en direct pour les clients visiteurs :
+            </h3>
+            <div className="flex items-center gap-3 flex-wrap">
+              {businessLinks.whatsappChannel && (
+                <a
+                  href={businessLinks.whatsappChannel}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>💬 Rejoindre Chaîne WhatsApp</span>
+                </a>
+              )}
+              {businessLinks.facebookPage && (
+                <a
+                  href={businessLinks.facebookPage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
+                >
+                  <Facebook className="w-4 h-4" />
+                  <span>👍 Voir Page Facebook</span>
+                </a>
+              )}
+              {businessLinks.instagramTiktok && (
+                <a
+                  href={businessLinks.instagramTiktok}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
+                >
+                  <Instagram className="w-4 h-4" />
+                  <span>📸 Instagram / TikTok</span>
+                </a>
+              )}
+              {businessLinks.website && (
+                <a
+                  href={businessLinks.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold flex items-center gap-2 border border-neutral-700 transition-all"
+                >
+                  <Globe className="w-4 h-4 text-sky-400" />
+                  <span>🌐 Visiter le Site Web</span>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 6: PERMISSIONS & CONTACTS ADMIN (Visible Uniquement pour Admin) */}
+      {adminTab === 'permissions' && (
+        <div className="space-y-6">
+          {/* Header Card with RED ADMINISTRATEUR BADGE */}
+          <div className="bg-neutral-900 text-white rounded-3xl border border-neutral-800 p-6 sm:p-8 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-800">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-red-600/20 text-red-500 border border-red-500/30 flex items-center justify-center shrink-0">
+                  <ShieldAlert className="w-7 h-7" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-3 py-1 rounded-full bg-red-600 text-white text-xs font-black tracking-wider uppercase shadow-md animate-pulse">
+                      ADMINISTRATEUR
+                    </span>
+                    <span className="text-xs text-neutral-400 font-mono">Super-Privilège Activé</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-black text-white">
+                    Permissions Système & Contacts Administratifs
+                  </h2>
+                  <p className="text-xs text-neutral-400">
+                    Gérez les privilèges de sécurité avancés et les canaux d'intervention directe de la plateforme.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* List of 5 Interactive Permissions Toggles */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                Liste des Permissions Système (Toggles Actifs)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* 1. Autoriser appel VoIP */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                      <PhoneCall className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Autoriser appel VoIP</div>
+                      <div className="text-[10px] text-neutral-400">Appels vocaux & vidéo WebRTC chiffrés</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdminPermissions((p) => ({ ...p, allowVoip: !p.allowVoip }))}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      adminPermissions.allowVoip ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                  </button>
+                </div>
+
+                {/* 2. Autoriser partage d'écran */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                      <Video className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Autoriser partage d'écran</div>
+                      <div className="text-[10px] text-neutral-400">Démonstration visuelle en direct</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdminPermissions((p) => ({ ...p, allowScreenShare: !p.allowScreenShare }))}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      adminPermissions.allowScreenShare ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                  </button>
+                </div>
+
+                {/* 3. Autoriser à voir tous les profils */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Autoriser à voir tous les profils</div>
+                      <div className="text-[10px] text-neutral-400">Accès annuaire complet clients & artisans</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdminPermissions((p) => ({ ...p, allowViewAllProfiles: !p.allowViewAllProfiles }))}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      adminPermissions.allowViewAllProfiles ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                  </button>
+                </div>
+
+                {/* 4. Autoriser suppression de compte */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center">
+                      <Trash2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Autoriser suppression de compte</div>
+                      <div className="text-[10px] text-neutral-400">Modération stricte & sanctions profils</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdminPermissions((p) => ({ ...p, allowDeleteAccount: !p.allowDeleteAccount }))}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      adminPermissions.allowDeleteAccount ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                  </button>
+                </div>
+
+                {/* 5. Autoriser mode support technique */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors md:col-span-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Autoriser mode support technique</div>
+                      <div className="text-[10px] text-neutral-400">Hotline d’assistance prioritaire en direct</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdminPermissions((p) => ({ ...p, allowTechSupportMode: !p.allowTechSupportMode }))}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      adminPermissions.allowTechSupportMode ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* BLOC CONTACTS ADMIN */}
+            <div className="pt-6 border-t border-neutral-800 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+                  <PhoneCall className="w-4 h-4 text-blue-400" />
+                  <span>Bloc Contacts Officiels Admin</span>
+                </h3>
+                <span className="text-[11px] text-neutral-400 font-mono">Assistance & Support 24/7</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* 1. Numéro support technique cliquable */}
+                <a
+                  href="tel:+2250503444508"
+                  className="p-4 rounded-2xl bg-neutral-800/90 border border-neutral-700 hover:border-blue-500 hover:bg-neutral-800 transition-all flex items-center gap-3 group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-neutral-400 font-bold uppercase">Support Technique</div>
+                    <div className="text-xs font-bold text-white font-mono">+225 0503444508</div>
+                  </div>
+                </a>
+
+                {/* 2. Email support */}
+                <a
+                  href="mailto:Adiminartisanpro.afrique@gmail.com"
+                  className="p-4 rounded-2xl bg-neutral-800/90 border border-neutral-700 hover:border-amber-500 hover:bg-neutral-800 transition-all flex items-center gap-3 group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div className="overflow-hidden">
+                    <div className="text-[10px] text-neutral-400 font-bold uppercase">Email Support</div>
+                    <div className="text-xs font-bold text-white truncate font-mono">
+                      Adiminartisanpro.afrique
+                    </div>
+                  </div>
+                </a>
+
+                {/* 3. Bouton WhatsApp Support ouvre http://wa.me directement */}
+                <a
+                  href="https://wa.me/2250503444508"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-800 hover:border-emerald-500 hover:bg-emerald-900/60 transition-all flex items-center gap-3 group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <MessageCircle className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-emerald-400 font-bold uppercase">WhatsApp Direct</div>
+                    <div className="text-xs font-bold text-white">wa.me/2250503444508</div>
+                  </div>
+                </a>
+
+                {/* 4. Bouton "Contacter tous les artisans" (message groupé) */}
+                <button
+                  type="button"
+                  onClick={() => setShowGroupModal(true)}
+                  className="p-4 rounded-2xl bg-gradient-to-r from-purple-900 to-indigo-900 border border-purple-700 hover:border-purple-500 transition-all flex items-center gap-3 text-left cursor-pointer group shadow-md"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <Send className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-purple-300 font-bold uppercase">Message Groupé</div>
+                    <div className="text-xs font-bold text-white">Contacter tous les artisans</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP / MODAL: VOIR PREUVE DE PAIEMENT MOBILE MONEY */}
+      {selectedProofWithdrawal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white text-neutral-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-neutral-200 space-y-6 animate-in zoom-in-95">
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-neutral-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xl shrink-0">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-emerald-800 uppercase tracking-wide">
+                    Preuve Officielle de Transaction
+                  </div>
+                  <h3 className="text-lg font-black text-neutral-950">
+                    Reçu de Retrait Mobile Money
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedProofWithdrawal(null)}
+                className="p-2 rounded-xl text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Receipt Body */}
+            <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-200 space-y-3 font-mono text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
+                <span className="text-neutral-500 font-sans">Référence Transaction :</span>
+                <span className="font-bold text-neutral-950">
+                  REF-{selectedProofWithdrawal.id.slice(0, 8).toUpperCase()}-MM
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 font-sans">Artisan Bénéficiaire :</span>
+                <span className="font-bold text-neutral-950">{selectedProofWithdrawal.userName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 font-sans">Numéro Mobile Money :</span>
+                <span className="font-bold text-neutral-950">{selectedProofWithdrawal.userPhone}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 font-sans">Opérateur Mobile :</span>
+                <span className="font-bold px-2 py-0.5 rounded-lg bg-orange-100 text-orange-900">
+                  {selectedProofWithdrawal.operator}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500 font-sans">Date & Heure :</span>
+                <span className="text-neutral-700">
+                  {new Date(selectedProofWithdrawal.date).toLocaleString('fr-FR')}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-neutral-200 text-sm">
+                <span className="text-neutral-900 font-sans font-extrabold">Montant Transféré :</span>
+                <span className="font-black text-emerald-700 text-base">
+                  {selectedProofWithdrawal.amount.toLocaleString()} FCFA
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-1 text-xs">
+                <span className="text-neutral-500 font-sans">Statut Plateforme :</span>
+                <span
+                  className={`font-bold px-2.5 py-0.5 rounded-full ${
+                    selectedProofWithdrawal.status === 'approuve'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : selectedProofWithdrawal.status === 'refuse'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {selectedProofWithdrawal.status === 'approuve'
+                    ? 'Payé & Transféré ✓'
+                    : selectedProofWithdrawal.status === 'refuse'
+                    ? 'Refusé / Remboursé'
+                    : 'En attente de validation'}
+                </span>
+              </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.print();
+                }}
+                className="px-4 py-2.5 rounded-xl border border-neutral-300 hover:bg-neutral-100 text-xs font-bold text-neutral-700 flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Imprimer Reçu</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedProofWithdrawal(null)}
+                className="px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-black text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP / MODAL: MESSAGE GROUPÉ À TOUS LES ARTISANS */}
+      {showGroupModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 text-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-neutral-800 space-y-5 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Contacter tous les artisans</h3>
+                  <p className="text-[11px] text-neutral-400">Diffusion instantanée aux {artisans.length} artisans</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGroupModal(false)}
+                className="p-1.5 rounded-xl text-neutral-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-neutral-300">Message groupé à transmettre :</label>
+              <textarea
+                rows={4}
+                value={groupMessage}
+                onChange={(e) => setGroupMessage(e.target.value)}
+                placeholder="Exemple : Chers artisans, une mise à jour sur les commissions de retrait Mobile Money est en ligne..."
+                className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-800 text-white text-xs border border-neutral-700 focus:outline-none focus:border-purple-500 resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowGroupModal(false)}
+                className="px-4 py-2.5 rounded-xl border border-neutral-700 text-neutral-300 text-xs font-bold hover:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={!groupMessage.trim() || isSendingGroup}
+                onClick={async () => {
+                  setIsSendingGroup(true);
+                  try {
+                    await api.sendNotification({
+                      title: 'Message Officiel de la Direction',
+                      message: groupMessage.trim(),
+                      type: 'system',
+                      linkPage: 'messages',
+                    });
+                    await refreshData();
+                    showToast({
+                      title: 'Message groupé transmis !',
+                      desc: `Les ${artisans.length} artisans ont reçu le message.`,
+                      type: 'success',
+                    });
+                    setGroupMessage('');
+                    setShowGroupModal(false);
+                  } catch (e: any) {
+                    showToast({ title: 'Erreur d’envoi', desc: e.message, type: 'warning' });
+                  } finally {
+                    setIsSendingGroup(false);
+                  }
+                }}
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isSendingGroup ? 'Envoi...' : 'Diffuser le message'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          MODALE MODÉRATION : BANNIR / DÉBANNIR DES COMPTES
+          ========================================================= */}
+      {showBanModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 text-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-neutral-700 space-y-4 animate-in zoom-in-95">
+            {/* Header modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-600/20 text-red-400 flex items-center justify-center">
+                  <UserX className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Gestion des Bannissements & Sanctions</h3>
+                  <p className="text-[11px] text-neutral-400">
+                    Bannir ou réactiver l'accès d'un utilisateur / artisan
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBanModal(false)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Onglets dans la modal */}
+            <div className="flex items-center gap-2 border-b border-neutral-800 pb-2">
+              <button
+                type="button"
+                onClick={() => setBanModalTab('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
+                  banModalTab === 'all'
+                    ? 'bg-red-600 text-white'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Tous les comptes ({users.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setBanModalTab('banned')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
+                  banModalTab === 'banned'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                Comptes suspendus ({bannedUserIds.length})
+              </button>
+            </div>
+
+            {/* Recherche */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Rechercher par nom, téléphone ou email..."
+                value={banSearchQuery}
+                onChange={(e) => setBanSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-red-500"
+              />
+            </div>
+
+            {/* Liste scrollable */}
+            <div className="max-h-72 overflow-y-auto space-y-2 pr-1 divide-y divide-neutral-800/60">
+              {users
+                .filter((u) => {
+                  if (banModalTab === 'banned') {
+                    return bannedUserIds.includes(u.id);
+                  }
+                  return true;
+                })
+                .filter((u) => {
+                  if (!banSearchQuery.trim()) return true;
+                  const q = banSearchQuery.toLowerCase();
+                  return (
+                    u.name.toLowerCase().includes(q) ||
+                    (u.email && u.email.toLowerCase().includes(q)) ||
+                    (u.phone && u.phone.includes(q))
+                  );
+                })
+                .map((u) => {
+                  const isBanned = bannedUserIds.includes(u.id);
+                  return (
+                    <div
+                      key={u.id}
+                      className="pt-2 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div>
+                        <div className="font-bold text-white flex items-center gap-2">
+                          <span>{u.name}</span>
+                          {isBanned && (
+                            <span className="text-[10px] bg-red-600/30 text-red-400 border border-red-500/50 px-2 py-0.5 rounded-full font-bold">
+                              SUSPENDU
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-neutral-400">
+                          {u.phone} • {u.role}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleBanUser(u.id, u.name)}
+                        className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                          isBanned
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                            : 'bg-red-600 hover:bg-red-500 text-white'
+                        }`}
+                      >
+                        {isBanned ? (
+                          <>
+                            <UserCheck className="w-3.5 h-3.5" />
+                            <span>Débannir</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserX className="w-3.5 h-3.5" />
+                            <span>Bannir</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Footer modal */}
+            <div className="pt-3 border-t border-neutral-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowBanModal(false)}
+                className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

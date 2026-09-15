@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Règles ouvertes pour environnement de test Artisan Pro Afrique
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    // Artisans collection: public read, allow create/update/write
+    match /artisans/{artisanId} {
+      allow read, write: if true;
+    }
+
+    // Clients collection: allow read and write
+    match /clients/{clientId} {
+      allow read, write: if true;
+    }
+
+    // Devis collection: allow read and write
+    match /devis/{devisId} {
+      allow read, write: if true;
+    }
+
+    // Messages collection: allow read and write
+    match /messages/{messageId} {
+      allow read, write: if true;
+    }
+
+    // Publications & Posts collection (global social feed for artisans & clients & admin)
+    match /publications/{pubId} {
+      allow read, write: if true;
+    }
+    match /posts/{postId} {
+      allow read, write: if true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Commentaires collection (global threaded comments)
+    match /commentaires/{commentId} {
+      allow read, write: if true;
+    }
+
+    // Subscriptions collection: allow read and write
+    match /subscriptions/{subscriptionId} {
+      allow read, write: if true;
+    }
+
+    // Payments collection: allow read and write
+    match /payments/{paymentId} {
+      allow read, write: if true;
+    }
+
+    // Admin Config (solde persistant boss)
+    match /admin_config/{configId} {
+      allow read, write: if true;
+    }
+
+    // Transactions Admin (historique des recharges)
+    match /transactions_admin/{txId} {
+      allow read, write: if true;
+    }
+  }
+}
