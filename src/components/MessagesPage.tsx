@@ -32,6 +32,9 @@ export default function Messages() {
     paymentModal,
     showToast,
     go,
+    langueActuelle,
+    changerLangue,
+    t,
   } = useApp();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -42,8 +45,6 @@ export default function Messages() {
   const [callModalOpen, setCallModalOpen] = useState(false);
   const [callModalMode, setCallModalMode] = useState<'audio' | 'video'>('audio');
   const [rateModalOpen, setRateModalOpen] = useState(false);
-  const [language, setLanguage] = useState<'FR' | 'EN'>('FR');
-  const [showLangMenu, setShowLangMenu] = useState(false);
   const [viewingStatus, setViewingStatus] = useState<{
     name: string;
     letter: string;
@@ -314,93 +315,6 @@ export default function Messages() {
 
   return (
     <div className="bg-[#0f172a] min-h-screen p-3 flex flex-col h-[100dvh] overflow-hidden select-none">
-      {/* HEADER - Tous les boutons gardés */}
-      <div className="bg-[#1e293b] rounded-full px-4 py-3 flex justify-between items-center shrink-0 shadow-md border border-slate-700/60 mb-3 z-30">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => go('home')}
-            className="text-white hover:text-yellow-400 transition-colors cursor-pointer text-lg p-0.5"
-            title="Menu"
-          >
-            ☰
-          </button>
-          <span className="text-yellow-400 font-bold tracking-wide">Artisan pro MS</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              showToast({
-                title: 'Notification',
-                desc: 'Vous avez 1 nouveau message.',
-                type: 'info',
-              })
-            }
-            className="relative text-yellow-400 hover:scale-105 cursor-pointer transition-transform text-lg"
-            title="Notifications"
-          >
-            🔔
-            <span className="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full w-4 h-4 text-[10px] font-bold flex items-center justify-center shadow-xs">
-              1
-            </span>
-          </button>
-
-          {/* Langue gardée + choix FR / EN */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowLangMenu(!showLangMenu)}
-              className="flex items-center gap-1 text-white hover:text-yellow-400 cursor-pointer text-xs transition-colors bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700/70"
-              title="Changer la langue"
-            >
-              <span>🌐</span>
-              <span>{language === 'FR' ? '🇫🇷' : '🇬🇧'}</span>
-              <span className="text-[9px] text-gray-400">▼</span>
-            </button>
-            {showLangMenu && (
-              <div className="absolute right-0 mt-1.5 w-28 bg-[#1e293b] border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 text-xs py-1 animate-in fade-in duration-150">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLanguage('FR');
-                    setShowLangMenu(false);
-                    showToast({ title: 'Langue', desc: 'Français sélectionné', type: 'info' });
-                  }}
-                  className={`w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-slate-700/80 transition-colors ${
-                    language === 'FR' ? 'text-yellow-400 font-bold' : 'text-slate-200'
-                  }`}
-                >
-                  <span>🇫🇷</span> <span>Français</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLanguage('EN');
-                    setShowLangMenu(false);
-                    showToast({ title: 'Language', desc: 'English selected', type: 'info' });
-                  }}
-                  className={`w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-slate-700/80 transition-colors ${
-                    language === 'EN' ? 'text-yellow-400 font-bold' : 'text-slate-200'
-                  }`}
-                >
-                  <span>🇬🇧</span> <span>English</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => go('home')}
-            className="text-white hover:text-yellow-400 transition-colors cursor-pointer text-base font-bold px-1"
-            title="Fermer"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
       {/* CONTENU QUI NE BOUGE PAS */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* LISTE CONTACTS - FIXE (id="liste") */}
@@ -410,18 +324,69 @@ export default function Messages() {
             mobileChatOpen ? 'hidden md:flex' : 'flex'
           }`}
         >
-          {/* TITRE - GARDÉ */}
+          {/* TITRE & BOUTONS LANGUE & BOUTONS SORTIE */}
           <div className="p-4 pb-2 shrink-0">
-            <h1 className="text-yellow-400 text-3xl font-bold">Messages</h1>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <button
+                type="button"
+                id="btn-sortir-messagerie"
+                onClick={() => go('home')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-yellow-400 hover:text-white border border-slate-700 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95"
+                title={t.sortir || t.Sortir || 'Sortir'}
+                aria-label={t.sortir || t.Sortir || 'Sortir'}
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>{t.sortir || t.Sortir || 'Sortir'}</span>
+              </button>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => changerLangue('fr')}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    langueActuelle === 'fr'
+                      ? 'bg-yellow-400 text-slate-900 shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                  }`}
+                  title="Français"
+                >
+                  🇫🇷 FR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changerLangue('en')}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    langueActuelle === 'en'
+                      ? 'bg-yellow-400 text-slate-900 shadow-sm'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                  }`}
+                  title="English"
+                >
+                  🇬🇧 EN
+                </button>
+                <button
+                  type="button"
+                  id="btn-fermer-messagerie"
+                  onClick={() => go('home')}
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 flex items-center justify-center transition-colors cursor-pointer ml-1"
+                  title={t.sortir || t.Sortir || 'Sortir'}
+                  aria-label={t.sortir || t.Sortir || 'Sortir'}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <h1 className="text-yellow-400 text-3xl font-bold">{t.messages || t.Messages}</h1>
             <p className="text-gray-400 text-sm mt-1">
-              Retrouvez vos contacts WhatsApp et discutez en toute sécurité.
+              {t.sousTitre || t.SousTitre}
             </p>
           </div>
 
           {/* STATUTS - TOUS GARDÉS, JUSTE CLIQUABLES MAINTENANT */}
           <div className="px-4 py-2 shrink-0">
             <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-md">
-              <p className="text-gray-400 text-xs font-bold tracking-wider uppercase">◎ STATUTS RÉCENTS</p>
+              <p className="text-gray-400 text-xs font-bold tracking-wider uppercase">◎ {t.statuts || t.Statuts}</p>
               <div className="flex gap-4 mt-3 overflow-x-auto pb-1 scrollbar-none">
                 {/* A */}
                 <div className="flex flex-col items-center shrink-0">
@@ -433,7 +398,7 @@ export default function Messages() {
                   >
                     A
                   </button>
-                  <span className="text-yellow-400 text-xs mt-1 font-medium">Ajouter</span>
+                  <span className="text-yellow-400 text-xs mt-1 font-medium">{t.ajouter || t.Ajouter || 'Ajouter'}</span>
                   <input
                     type="file"
                     ref={statusFileInputRef}
@@ -576,7 +541,7 @@ export default function Messages() {
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
               <input
                 type="text"
-                placeholder="Rechercher un artisan..."
+                placeholder={t.recherche || t.Recherche}
                 value={convSearch}
                 onChange={(e) => setConvSearch(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 rounded-xl border border-slate-700 text-xs bg-slate-900/90 text-white placeholder-slate-400 focus:outline-none focus:border-yellow-400"
@@ -718,6 +683,18 @@ export default function Messages() {
                 >
                   <FileText className="w-3.5 h-3.5" />
                   <span>Devis</span>
+                </button>
+
+                {/* Bouton pour sortir directement de la messagerie */}
+                <button
+                  type="button"
+                  id="btn-sortir-chat"
+                  onClick={() => go('home')}
+                  className="w-9 h-9 rounded-full bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-700 flex items-center justify-center cursor-pointer transition-all shadow-xs ml-0.5"
+                  title={t.sortir || t.Sortir || 'Sortir de la messagerie'}
+                  aria-label={t.sortir || t.Sortir || 'Sortir de la messagerie'}
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>

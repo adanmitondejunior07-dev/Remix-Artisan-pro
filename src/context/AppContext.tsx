@@ -503,7 +503,10 @@ function loadLocalArtisanPosts(): SocialPost[] {
   // Langue & Pays africains (style Facebook)
   const [langueActuelle, setLangueActuelle] = useState<LanguageCode>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('artisanpro_langue');
+      const saved =
+        localStorage.getItem('app_lang') ||
+        localStorage.getItem('langue') ||
+        localStorage.getItem('artisanpro_langue');
       if (saved && (saved === 'fr' || saved === 'en')) return saved as LanguageCode;
     }
     return 'fr';
@@ -520,6 +523,8 @@ function loadLocalArtisanPosts(): SocialPost[] {
   const changerLangue = useCallback((code: LanguageCode) => {
     setLangueActuelle(code);
     if (typeof window !== 'undefined') {
+      localStorage.setItem('app_lang', code);
+      localStorage.setItem('langue', code);
       localStorage.setItem('artisanpro_langue', code);
     }
   }, []);
@@ -532,9 +537,12 @@ function loadLocalArtisanPosts(): SocialPost[] {
     // Si le pays sélectionné correspond à un pays avec langue par défaut (ex: Nigeria, Ghana -> en)
     const trouve = paysAfricains.find((p) => p.nom.toLowerCase() === nomPays.toLowerCase());
     if (trouve && trouve.langue && (trouve.langue === 'fr' || trouve.langue === 'en')) {
-      setLangueActuelle(trouve.langue as LanguageCode);
+      const langCode = trouve.langue as LanguageCode;
+      setLangueActuelle(langCode);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('artisanpro_langue', trouve.langue);
+        localStorage.setItem('app_lang', langCode);
+        localStorage.setItem('langue', langCode);
+        localStorage.setItem('artisanpro_langue', langCode);
       }
     }
   }, []);
