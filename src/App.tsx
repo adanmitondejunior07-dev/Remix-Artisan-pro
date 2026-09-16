@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext.tsx';
+import { LangProvider } from './LangContext.tsx';
 import { Navbar } from './components/Navbar.tsx';
 import { Footer } from './components/Footer.tsx';
 import { BottomNav } from './components/BottomNav.tsx';
@@ -280,9 +281,11 @@ const AppContent: React.FC = () => {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
+      <LangProvider>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </LangProvider>
     </ErrorBoundary>
   );
 }

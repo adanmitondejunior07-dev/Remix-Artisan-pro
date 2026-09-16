@@ -16,6 +16,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
+import { useLang } from '../LangContext.tsx';
 import { api } from '../services/api.ts';
 import { firestoreService } from '../services/firestoreService.ts';
 import type { Message } from '../types.ts';
@@ -23,6 +24,7 @@ import { VoipCallModal } from './VoipCallModal.tsx';
 import { RateArtisanModal } from './Modals/RateArtisanModal.tsx';
 
 export default function Messages() {
+  const { t: tLang, lang, changeLang } = useLang();
   const {
     artisans,
     selectedArtisanId,
@@ -34,8 +36,10 @@ export default function Messages() {
     go,
     langueActuelle,
     changerLangue,
-    t,
+    t: tApp,
   } = useApp();
+
+  const t = tLang || tApp;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -339,54 +343,60 @@ export default function Messages() {
                 <span>{t.sortir || t.Sortir || 'Sortir'}</span>
               </button>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => changerLangue('fr')}
-                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    langueActuelle === 'fr'
+                  onClick={() => {
+                    changeLang('fr');
+                    changerLangue('fr');
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    lang === 'fr'
                       ? 'bg-yellow-400 text-slate-900 shadow-sm'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
                   }`}
                   title="Français"
                 >
-                  🇫🇷 FR
+                  🇫🇷 Français
                 </button>
                 <button
                   type="button"
-                  onClick={() => changerLangue('en')}
-                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    langueActuelle === 'en'
+                  onClick={() => {
+                    changeLang('en');
+                    changerLangue('en');
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    lang === 'en'
                       ? 'bg-yellow-400 text-slate-900 shadow-sm'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
                   }`}
                   title="English"
                 >
-                  🇬🇧 EN
+                  🇬🇧 English
                 </button>
                 <button
                   type="button"
                   id="btn-fermer-messagerie"
                   onClick={() => go('home')}
                   className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 flex items-center justify-center transition-colors cursor-pointer ml-1"
-                  title={t.sortir || t.Sortir || 'Sortir'}
-                  aria-label={t.sortir || t.Sortir || 'Sortir'}
+                  title={t.sortir || 'Sortir'}
+                  aria-label={t.sortir || 'Sortir'}
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            <h1 className="text-yellow-400 text-3xl font-bold">{t.messages || t.Messages}</h1>
+            <h1 className="text-yellow-400 text-3xl font-bold">{t.messages}</h1>
             <p className="text-gray-400 text-sm mt-1">
-              {t.sousTitre || t.SousTitre}
+              {t.sousTitre}
             </p>
           </div>
 
           {/* STATUTS - TOUS GARDÉS, JUSTE CLIQUABLES MAINTENANT */}
           <div className="px-4 py-2 shrink-0">
             <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-md">
-              <p className="text-gray-400 text-xs font-bold tracking-wider uppercase">◎ {t.statuts || t.Statuts}</p>
+              <h2 className="text-gray-400 text-xs font-bold tracking-wider uppercase">◎ {t.statuts}</h2>
               <div className="flex gap-4 mt-3 overflow-x-auto pb-1 scrollbar-none">
                 {/* A */}
                 <div className="flex flex-col items-center shrink-0">
@@ -398,7 +408,7 @@ export default function Messages() {
                   >
                     A
                   </button>
-                  <span className="text-yellow-400 text-xs mt-1 font-medium">{t.ajouter || t.Ajouter || 'Ajouter'}</span>
+                  <span className="text-yellow-400 text-xs mt-1 font-medium">{t.ajouter}</span>
                   <input
                     type="file"
                     ref={statusFileInputRef}
@@ -541,7 +551,7 @@ export default function Messages() {
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
               <input
                 type="text"
-                placeholder={t.recherche || t.Recherche}
+                placeholder={t.recherche}
                 value={convSearch}
                 onChange={(e) => setConvSearch(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 rounded-xl border border-slate-700 text-xs bg-slate-900/90 text-white placeholder-slate-400 focus:outline-none focus:border-yellow-400"
