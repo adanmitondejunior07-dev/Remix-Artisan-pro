@@ -39,6 +39,7 @@ export const Navbar: React.FC = () => {
     authModal,
     supportModal,
     logout,
+    t,
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -187,8 +188,8 @@ export const Navbar: React.FC = () => {
           type="button"
           onClick={() => go('messages')}
           className="header-msg w-9 h-9 rounded-full bg-[#2a2a2a] hover:bg-[#3a3a3a] text-white flex items-center justify-center cursor-pointer transition-colors"
-          title="Messagerie"
-          aria-label="Messagerie"
+          title={t.Messages || "Messages"}
+          aria-label={t.Messages || "Messages"}
         >
           💬
         </button>

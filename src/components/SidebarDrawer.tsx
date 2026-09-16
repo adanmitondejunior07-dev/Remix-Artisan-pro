@@ -2,7 +2,8 @@ import React, { useEffect } from 'react';
 import { useApp } from '../context/AppContext.tsx';
 import type { PageName } from '../context/AppContext.tsx';
 import { isSuperAdmin } from '../config/adminConfig.ts';
-import { X } from 'lucide-react';
+import { paysAfricains } from '../data/langues.ts';
+import { X, Globe } from 'lucide-react';
 
 interface SidebarDrawerProps {
   isOpen: boolean;
@@ -17,6 +18,11 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
     unreadNotifsCount,
     logout,
     supportModal,
+    langueActuelle,
+    changerLangue,
+    paysSelectionne,
+    choisirPays,
+    t,
   } = useApp();
 
   // Close on Escape key
@@ -417,7 +423,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
           <div className="h-px bg-[#E5E7EB] my-2 mx-3" />
 
           {/* SECTION 5: SUPPORT & ACTIONS */}
-          <div className="px-2 space-y-0.5 pb-6">
+          <div className="px-2 space-y-0.5 pb-2">
             <button
               onClick={() => {
                 supportModal.open();
@@ -443,6 +449,62 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
               </div>
               <span className="truncate">Déconnexion</span>
             </button>
+          </div>
+
+          <div className="h-px bg-[#E5E7EB] my-2 mx-3" />
+
+          {/* SÉLECTEUR DE LANGUE & PAYS AFRICAINS - STYLE FACEBOOK */}
+          <div className="language-selector-facebook p-3 m-2 rounded-2xl bg-neutral-50 border border-neutral-200 text-xs space-y-2.5 mb-6">
+            <div className="flex items-center justify-between">
+              <p className="font-black text-neutral-800 flex items-center gap-1">
+                <Globe className="w-3.5 h-3.5 text-[#FF6B00]" />
+                <span>🌐 {t.Langue || 'Langue'}</span>
+              </p>
+              <span className="text-[10px] font-bold text-neutral-500 uppercase">
+                {paysSelectionne}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                id="drawer-lang-fr"
+                onClick={() => changerLangue('fr')}
+                className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-xs transition-colors cursor-pointer text-center ${
+                  langueActuelle === 'fr'
+                    ? 'bg-[#FF6B00] text-white shadow-2xs'
+                    : 'bg-white text-neutral-700 hover:bg-neutral-100 border border-neutral-200'
+                }`}
+              >
+                🇫🇷 Français
+              </button>
+              <button
+                type="button"
+                id="drawer-lang-en"
+                onClick={() => changerLangue('en')}
+                className={`flex-1 py-1.5 px-2 rounded-lg font-bold text-xs transition-colors cursor-pointer text-center ${
+                  langueActuelle === 'en'
+                    ? 'bg-[#FF6B00] text-white shadow-2xs'
+                    : 'bg-white text-neutral-700 hover:bg-neutral-100 border border-neutral-200'
+                }`}
+              >
+                🇬🇧 English
+              </button>
+            </div>
+
+            <select
+              id="drawer-select-pays"
+              value={paysSelectionne}
+              onChange={(e) => choisirPays(e.target.value)}
+              aria-label="Choisir un pays africain"
+              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-neutral-200 text-xs font-bold text-neutral-800 shadow-2xs focus:outline-none focus:ring-1 focus:ring-[#FF6B00] cursor-pointer"
+            >
+              {paysAfricains.map((p) => (
+                <option key={p.nom} value={p.nom}>
+                  {p.drapeau} {p.nom}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </aside>

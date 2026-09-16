@@ -404,3 +404,11 @@ export interface Payment {
   transaction_id: string;
   status: 'pending' | 'completed' | 'failed' | string;
 }
+
+export interface PasswordReset {
+  id?: string | number;
+  email?: string;
+  phone?: string;
+  code: string;
+  created_at?: string;
+}

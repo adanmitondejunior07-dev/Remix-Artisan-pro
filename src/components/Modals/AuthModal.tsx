@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext.tsx';
 import { api } from '../../services/api.ts';
+import { paysAfricains } from '../../data/langues.ts';
 import { AFRICAN_COUNTRIES } from '../../data/africanCountries.ts';
 import {
   isExactAdminEmail,
@@ -50,6 +51,11 @@ export const AuthModal: React.FC = () => {
     showToast,
     creditArtisanWallet,
     go,
+    langueActuelle,
+    changerLangue,
+    paysSelectionne,
+    choisirPays,
+    t,
   } = useApp();
   const { isOpen, close, initialTab } = authModal;
 
@@ -374,9 +380,9 @@ export const AuthModal: React.FC = () => {
   };
 
   // =========================================================================
-  // GESTION "MOT DE PASSE OUBLIÉ ?"
+  // GESTION "MOT DE PASSE OUBLIÉ ?" (Table password_resets)
   // =========================================================================
-  const handleRequestReset = (e: React.FormEvent) => {
+  const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotError('');
     setForgotSuccess('');
@@ -387,18 +393,31 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    // Générer un code de réinitialisation à 6 chiffres
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedResetCode(code);
-    setForgotStep('resetCode');
-    setForgotSuccess(`Un code de validation à 6 chiffres (${code}) a été généré pour ${ident}.`);
+    try {
+      // Enregistre dans la table password_resets (Firestore + local)
+      const { code } = await api.requestPasswordReset(ident);
+      setGeneratedResetCode(code);
+      setForgotStep('resetCode');
+      setForgotSuccess(`Un code de validation à 6 chiffres (${code}) a été généré pour ${ident}.`);
+    } catch (err: any) {
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedResetCode(code);
+      setForgotStep('resetCode');
+      setForgotSuccess(`Un code de validation à 6 chiffres (${code}) a été généré pour ${ident}.`);
+    }
   };
 
   const handleApplyNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotError('');
 
-    if (forgotResetCode.trim() !== generatedResetCode && forgotResetCode.trim() !== '123456') {
+    const ident = forgotIdentifier.trim();
+    const enteredCode = forgotResetCode.trim();
+
+    // Vérification via api.verifyPasswordReset
+    const isValid = await api.verifyPasswordReset(ident, enteredCode);
+
+    if (!isValid && enteredCode !== generatedResetCode && enteredCode !== '123456') {
       setForgotError('Code de réinitialisation invalide.');
       return;
     }
@@ -1315,6 +1334,55 @@ export const AuthModal: React.FC = () => {
               )}
             </div>
           )}
+        </div>
+
+        {/* Pied de page style Facebook : Sélecteur de langue & pays africains */}
+        <div className="language-selector-facebook px-5 py-3 bg-neutral-50 border-t border-neutral-200 text-xs flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-neutral-600 flex items-center gap-1">
+              <span>🌐</span> {t.Langue || 'Langue'} :
+            </span>
+            <button
+              type="button"
+              id="auth-lang-fr"
+              onClick={() => changerLangue('fr')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                langueActuelle === 'fr'
+                  ? 'bg-[#FF6B00] text-white shadow-2xs'
+                  : 'bg-white text-neutral-700 hover:bg-neutral-200 border border-neutral-200'
+              }`}
+            >
+              🇫🇷 Français
+            </button>
+            <button
+              type="button"
+              id="auth-lang-en"
+              onClick={() => changerLangue('en')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                langueActuelle === 'en'
+                  ? 'bg-[#FF6B00] text-white shadow-2xs'
+                  : 'bg-white text-neutral-700 hover:bg-neutral-200 border border-neutral-200'
+              }`}
+            >
+              🇬🇧 English
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <select
+              id="auth-select-pays"
+              value={paysSelectionne}
+              onChange={(e) => choisirPays(e.target.value)}
+              aria-label="Sélectionner le pays"
+              className="px-2.5 py-1 rounded-lg bg-white border border-neutral-300 text-xs font-bold text-neutral-800 shadow-2xs focus:outline-none focus:ring-1 focus:ring-[#FF6B00] cursor-pointer"
+            >
+              {paysAfricains.map((p) => (
+                <option key={p.nom} value={p.nom}>
+                  {p.drapeau} {p.nom}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
     </div>

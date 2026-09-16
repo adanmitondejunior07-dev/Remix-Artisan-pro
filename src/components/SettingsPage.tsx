@@ -28,6 +28,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
+import { paysAfricains, langues } from '../data/langues.ts';
 import { isExactAdminEmail, isSuperAdmin } from '../config/adminConfig.ts';
 import {
   loadAdminPermissions,
@@ -48,6 +49,11 @@ export const SettingsPage: React.FC = () => {
     isSubscriptionExpired,
     canAccessProFeatures,
     walletBalance,
+    langueActuelle,
+    changerLangue,
+    paysSelectionne,
+    choisirPays,
+    t,
   } = useApp();
 
   const isAdmin = isSuperAdmin(currentUser);
@@ -646,28 +652,101 @@ export const SettingsPage: React.FC = () => {
                 </p>
               </div>
 
+              {/* Sélecteur de Langue & Pays Africains - Style Facebook */}
+              <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-4">
+                <div className="language-selector-facebook">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <p className="text-sm font-black text-neutral-900 flex items-center gap-1.5">
+                      <Globe className="w-4 h-4 text-[#FF6B00]" />
+                      <span>🌐 {t.Langue || 'Langue'} & {t.SelectionnerPays || 'Pays'}</span>
+                    </p>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-orange-100 text-[#FF6B00] border border-orange-200">
+                      {langueActuelle === 'en' ? '🇬🇧 English' : '🇫🇷 Français'} · {paysSelectionne}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <button
+                      type="button"
+                      id="btn-lang-fr"
+                      onClick={() => changerLangue('fr')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border ${
+                        langueActuelle === 'fr'
+                          ? 'bg-[#FF6B00] text-white border-[#FF6B00] shadow-sm'
+                          : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-300'
+                      }`}
+                    >
+                      <span>🇫🇷</span>
+                      <span>Français</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-lang-en"
+                      onClick={() => changerLangue('en')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border ${
+                        langueActuelle === 'en'
+                          ? 'bg-[#FF6B00] text-white border-[#FF6B00] shadow-sm'
+                          : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-300'
+                      }`}
+                    >
+                      <span>🇬🇧</span>
+                      <span>English</span>
+                    </button>
+
+                    <div className="flex-1 min-w-[200px]">
+                      <select
+                        id="select-pays-africains"
+                        value={paysSelectionne}
+                        onChange={(e) => choisirPays(e.target.value)}
+                        aria-label="Sélectionner votre pays africain"
+                        className="w-full px-3.5 py-2 rounded-xl bg-white border border-neutral-300 text-xs font-bold text-neutral-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#FF6B00] cursor-pointer"
+                      >
+                        {paysAfricains.map((p) => (
+                          <option key={p.nom} value={p.nom}>
+                            {p.drapeau} {p.nom}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-1">
                   <span className="text-xs font-bold text-neutral-500 uppercase">Langue d'affichage</span>
-                  <div className="text-sm font-black text-neutral-900">Français (Afrique de l'Ouest)</div>
-                  <span className="text-[11px] text-neutral-400">Français standard optimisé pour l'Afrique</span>
+                  <div className="text-sm font-black text-neutral-900">
+                    {langueActuelle === 'en' ? 'English (Pan-African)' : 'Français (Afrique de l’Ouest & Centrale)'}
+                  </div>
+                  <span className="text-[11px] text-neutral-400">
+                    {langueActuelle === 'en' ? 'English language selected' : 'Français standard optimisé pour l’Afrique'}
+                  </span>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-1">
                   <span className="text-xs font-bold text-neutral-500 uppercase">Devise Principale</span>
-                  <div className="text-sm font-black text-neutral-900">Franc CFA (FCFA / XOF)</div>
-                  <span className="text-[11px] text-neutral-400">Supporte FCFA, GNF, NGN selon pays</span>
+                  <div className="text-sm font-black text-neutral-900">
+                    {paysSelectionne === 'Nigeria'
+                      ? 'Naira (₦ / NGN)'
+                      : paysSelectionne === 'Ghana'
+                      ? 'Ghana Cedi (GH₵ / GHS)'
+                      : paysSelectionne === 'Afrique du Sud'
+                      ? 'South African Rand (R / ZAR)'
+                      : 'Franc CFA (FCFA / XOF)'}
+                  </div>
+                  <span className="text-[11px] text-neutral-400">Devise calculée selon votre pays</span>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-1">
                   <span className="text-xs font-bold text-neutral-500 uppercase">Pays de Résidence</span>
-                  <div className="text-sm font-black text-neutral-900">{currentUser?.country || 'Côte d’Ivoire'}</div>
-                  <span className="text-[11px] text-neutral-400">Ville de référence : {currentUser?.city || 'Abidjan'}</span>
+                  <div className="text-sm font-black text-neutral-900">{paysSelectionne}</div>
+                  <span className="text-[11px] text-neutral-400">Ville de référence : {currentUser?.city || 'Capitale économique'}</span>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-1">
                   <span className="text-xs font-bold text-neutral-500 uppercase">Opérateurs Paiement</span>
-                  <div className="text-sm font-black text-neutral-900">Wave, Orange, MTN, Moov</div>
+                  <div className="text-sm font-black text-neutral-900">Wave, Orange, MTN, Moov, CinetPay</div>
                   <span className="text-[11px] text-neutral-400">Transactions instantanées sans frais cachés</span>
                 </div>
               </div>

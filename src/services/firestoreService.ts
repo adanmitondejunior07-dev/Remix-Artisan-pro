@@ -32,6 +32,7 @@ const ADMINS_COL = 'admins';
 const POSTS_COL = 'posts';
 const PUBLICATIONS_COL = 'publications';
 const COMMENTAIRES_COL = 'commentaires';
+const PASSWORD_RESETS_COL = 'password_resets';
 
 let isSeedingArtisans = false;
 let isSeedingClients = false;
@@ -868,6 +869,49 @@ export const firestoreService = {
       );
     } catch {
       return () => {};
+    }
+  },
+
+  // ==========================================
+  // PASSWORD RESETS (collection 'password_resets')
+  // ==========================================
+  async createPasswordReset(data: { email?: string; phone?: string; code: string }): Promise<string> {
+    try {
+      const id = `reset_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const docRef = doc(firestore, PASSWORD_RESETS_COL, id);
+      await setDoc(docRef, {
+        id,
+        email: data.email || null,
+        phone: data.phone || null,
+        code: String(data.code),
+        created_at: new Date().toISOString(),
+      });
+      return id;
+    } catch (err) {
+      console.warn('createPasswordReset error:', err);
+      return `local_reset_${Date.now()}`;
+    }
+  },
+
+  async verifyPasswordResetCode(identifier: string, code: string): Promise<boolean> {
+    try {
+      const colRef = collection(firestore, PASSWORD_RESETS_COL);
+      const snapshot = await getDocs(colRef);
+      const cleanIdent = identifier.trim().toLowerCase();
+      const cleanCode = code.trim();
+
+      for (const d of snapshot.docs) {
+        const data = d.data();
+        const dEmail = (data.email || '').toLowerCase().trim();
+        const dPhone = (data.phone || '').trim();
+        if ((dEmail === cleanIdent || dPhone === cleanIdent) && String(data.code) === cleanCode) {
+          return true;
+        }
+      }
+      return false;
+    } catch (err) {
+      console.warn('verifyPasswordResetCode error:', err);
+      return false;
     }
   },
 };

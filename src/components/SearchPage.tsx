@@ -17,6 +17,7 @@ export const SearchPage: React.FC = () => {
     userLocation,
     requestUserLocation,
     go,
+    t,
   } = useApp();
 
   const [selectedCountry, setSelectedCountry] = useState<string>('Tous les pays');
@@ -161,10 +162,10 @@ export const SearchPage: React.FC = () => {
             <input
               id="searchInput"
               type="text"
-              placeholder="Métier, nom d'artisan, ville, service spécifique..."
+              placeholder={t.Recherche || "Rechercher un artisan..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#7AC74F]/30 focus:border-[#7AC74F]"
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 focus:border-[#FF6B00]"
             />
             {searchQuery && (
               <button

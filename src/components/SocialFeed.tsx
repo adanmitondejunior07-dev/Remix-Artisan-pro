@@ -39,6 +39,7 @@ export const SocialFeed: React.FC = () => {
     createSocialPost,
     currentUser,
     currentArtisan,
+    artisans,
     showToast,
     followingArtisans,
     toggleFollowArtisan,
@@ -46,6 +47,8 @@ export const SocialFeed: React.FC = () => {
     isSubscriptionExpired,
     paymentModal,
     quoteModal,
+    setSelectedArtisanId,
+    t,
   } = useApp();
 
   // Create post modal state
@@ -259,6 +262,84 @@ export const SocialFeed: React.FC = () => {
             <Plus className="w-3.5 h-3.5 stroke-[3]" />
             <span>Publier</span>
           </button>
+        </div>
+      </div>
+
+      {/* STATUTS RÉCENTS / STORIES (Style Facebook) */}
+      <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-xs p-3.5 mb-4">
+        <div className="flex items-center justify-between mb-2.5 px-1">
+          <span className="text-[11px] font-black tracking-wider text-neutral-500 uppercase">
+            {t.Statuts || 'STATUTS RÉCENTS'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setIsCreatingPost(true)}
+            className="text-xs font-bold text-[#FF6B00] hover:underline cursor-pointer flex items-center gap-1"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{t.Ajouter || 'Ajouter'}</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
+          {/* Story 1 : L'utilisateur actuel */}
+          <div
+            onClick={() => setIsCreatingPost(true)}
+            className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group"
+          >
+            <div className="relative w-14 h-14 rounded-full p-[2px] border-2 border-dashed border-[#FF6B00] flex items-center justify-center bg-white group-hover:scale-105 transition-transform">
+              <div className="w-full h-full rounded-full bg-neutral-100 flex items-center justify-center font-black text-sm text-neutral-700 overflow-hidden">
+                {currentUser?.avatarUrl || currentArtisan?.avatarUrl ? (
+                  <img
+                    src={currentUser?.avatarUrl || currentArtisan?.avatarUrl}
+                    alt="Vous"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span>{currentUser?.name?.slice(0, 2).toUpperCase() || 'AP'}</span>
+                )}
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#FF6B00] text-white flex items-center justify-center text-xs font-black shadow-xs border-2 border-white">
+                +
+              </div>
+            </div>
+            <span className="text-[11px] font-semibold text-neutral-700 max-w-[64px] truncate text-center">
+              {t.Ajouter || 'Vous'}
+            </span>
+          </div>
+
+          {/* Artisans récents / statuts */}
+          {artisans.slice(0, 8).map((art) => (
+            <div
+              key={art.id}
+              onClick={() => {
+                setSelectedArtisanId(art.id);
+                go('profile');
+              }}
+              className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group"
+            >
+              <div className="w-14 h-14 rounded-full p-[2px] bg-gradient-to-tr from-[#FF6B00] to-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+                <div className="w-full h-full rounded-full bg-white p-[2px]">
+                  <div className="w-full h-full rounded-full bg-neutral-100 flex items-center justify-center text-lg font-bold overflow-hidden">
+                    {art.avatarUrl ? (
+                      <img
+                        src={art.avatarUrl}
+                        alt={art.name}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span>{art.emoji || '🛠️'}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <span className="text-[11px] font-semibold text-neutral-700 max-w-[64px] truncate text-center">
+                {art.name.split(' ')[0]}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -27,6 +27,12 @@ import {
   INITIAL_WITHDRAWALS,
 } from '../data/socialFeedData.ts';
 import {
+  langues,
+  paysAfricains,
+  type LanguageCode,
+  type LanguageTranslation,
+} from '../data/langues.ts';
+import {
   PERMANENT_OFFICIAL_CHANNELS,
   cleanAndNormalizeLink,
 } from '../utils/channelUtils.ts';
@@ -137,6 +143,12 @@ interface AppContextType {
   activeOtp: ActiveOtpData | null;
   sendOtp: (identifier: string, type?: 'inscription' | 'reconnexion') => Promise<string>;
   verifyOtp: (identifier: string, code: string) => boolean;
+  // Langues & Pays Africains (style Facebook)
+  langueActuelle: LanguageCode;
+  t: LanguageTranslation;
+  changerLangue: (code: LanguageCode) => void;
+  paysSelectionne: string;
+  choisirPays: (nomPays: string) => void;
   // Modals
   quoteModal: {
     isOpen: boolean;
@@ -487,6 +499,47 @@ function loadLocalArtisanPosts(): SocialPost[] {
 
   // OTP State (Prompt 1: 5 minutes expiry)
   const [activeOtp, setActiveOtp] = useState<ActiveOtpData | null>(null);
+
+  // Langue & Pays africains (style Facebook)
+  const [langueActuelle, setLangueActuelle] = useState<LanguageCode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('artisanpro_langue');
+      if (saved && (saved === 'fr' || saved === 'en')) return saved as LanguageCode;
+    }
+    return 'fr';
+  });
+
+  const [paysSelectionne, setPaysSelectionne] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('artisanpro_pays');
+      if (saved) return saved;
+    }
+    return "Côte d'Ivoire";
+  });
+
+  const changerLangue = useCallback((code: LanguageCode) => {
+    setLangueActuelle(code);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('artisanpro_langue', code);
+    }
+  }, []);
+
+  const choisirPays = useCallback((nomPays: string) => {
+    setPaysSelectionne(nomPays);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('artisanpro_pays', nomPays);
+    }
+    // Si le pays sélectionné correspond à un pays avec langue par défaut (ex: Nigeria, Ghana -> en)
+    const trouve = paysAfricains.find((p) => p.nom.toLowerCase() === nomPays.toLowerCase());
+    if (trouve && trouve.langue && (trouve.langue === 'fr' || trouve.langue === 'en')) {
+      setLangueActuelle(trouve.langue as LanguageCode);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('artisanpro_langue', trouve.langue);
+      }
+    }
+  }, []);
+
+  const t = langues[langueActuelle] || langues.fr;
 
   // Toast
   const [toast, setToast] = useState<ToastInfo | null>(null);
@@ -1713,6 +1766,11 @@ function loadLocalArtisanPosts(): SocialPost[] {
         activeOtp,
         sendOtp,
         verifyOtp,
+        langueActuelle,
+        t,
+        changerLangue,
+        paysSelectionne,
+        choisirPays,
         quoteModal: {
           isOpen: quoteModalOpen,
           artisan: quoteTargetArtisan,
