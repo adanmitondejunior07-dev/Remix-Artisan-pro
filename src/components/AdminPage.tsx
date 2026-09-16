@@ -57,6 +57,12 @@ import {
   cleanAndNormalizeLink,
   isValidOfficialUrl,
 } from '../utils/channelUtils.ts';
+import {
+  loadAdminPermissions,
+  saveAdminPermissions,
+  canManageAdminPermissions,
+  type SystemAdminPermissions,
+} from '../utils/adminPermissionsStorage.ts';
 
 const FounderQrCodeSvg: React.FC<{ size?: number; className?: string }> = ({ size = 68, className = '' }) => (
   <svg
@@ -256,14 +262,42 @@ export const AdminPage: React.FC = () => {
   // Selected withdrawal for payment proof modal
   const [selectedProofWithdrawal, setSelectedProofWithdrawal] = useState<WithdrawalRequest | null>(null);
 
-  // Admin Permissions state with toggles
-  const [adminPermissions, setAdminPermissions] = useState({
-    allowVoip: true,
-    allowScreenShare: true,
-    allowViewAllProfiles: true,
-    allowDeleteAccount: true,
-    allowTechSupportMode: true,
-  });
+  // Admin Permissions state with persistent storage in localStorage 'admin_permissions'
+  const [adminPermissions, setAdminPermissions] = useState<SystemAdminPermissions>(() => loadAdminPermissions());
+
+  // Listen to cross-component changes of permissions
+  useEffect(() => {
+    const handlePermsChange = (e: any) => {
+      if (e.detail) setAdminPermissions(e.detail);
+      else setAdminPermissions(loadAdminPermissions());
+    };
+    window.addEventListener('admin_permissions_updated', handlePermsChange);
+    return () => window.removeEventListener('admin_permissions_updated', handlePermsChange);
+  }, []);
+
+  const handleTogglePermission = (key: keyof SystemAdminPermissions) => {
+    const isAllowed = canManageAdminPermissions(currentUser?.email);
+    if (!isAllowed) {
+      showToast({
+        title: 'Accès restreint',
+        desc: 'Seul le Directeur Général ou le Créateur Secours peut modifier les permissions.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    const updated = {
+      ...adminPermissions,
+      [key]: !adminPermissions[key],
+    };
+    saveAdminPermissions(updated);
+    setAdminPermissions(updated);
+    showToast({
+      title: 'Permission mise à jour',
+      desc: `La permission "${key}" a été sauvegardée dans les paramètres système.`,
+      type: 'success',
+    });
+  };
 
   // Business links inputs for Admin / Platform (Canaux Officiels)
   const [businessLinks, setBusinessLinks] = useState({
@@ -1325,9 +1359,9 @@ export const AdminPage: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setAdminPermissions((p) => ({ ...p, allowVoip: !p.allowVoip }))}
+                onClick={() => handleTogglePermission('voip')}
                 className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                  adminPermissions.allowVoip ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                  adminPermissions.voip ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
                 }`}
               >
                 <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
@@ -1347,9 +1381,9 @@ export const AdminPage: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setAdminPermissions((p) => ({ ...p, allowScreenShare: !p.allowScreenShare }))}
+                onClick={() => handleTogglePermission('screen_share')}
                 className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                  adminPermissions.allowScreenShare ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                  adminPermissions.screen_share ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
                 }`}
               >
                 <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
@@ -1369,9 +1403,9 @@ export const AdminPage: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setAdminPermissions((p) => ({ ...p, allowViewAllProfiles: !p.allowViewAllProfiles }))}
+                onClick={() => handleTogglePermission('view_all_profiles')}
                 className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                  adminPermissions.allowViewAllProfiles ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                  adminPermissions.view_all_profiles ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
                 }`}
               >
                 <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
@@ -1391,9 +1425,9 @@ export const AdminPage: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setAdminPermissions((p) => ({ ...p, allowDeleteAccount: !p.allowDeleteAccount }))}
+                onClick={() => handleTogglePermission('delete_account')}
                 className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                  adminPermissions.allowDeleteAccount ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                  adminPermissions.delete_account ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
                 }`}
               >
                 <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
@@ -1413,9 +1447,9 @@ export const AdminPage: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setAdminPermissions((p) => ({ ...p, allowTechSupportMode: !p.allowTechSupportMode }))}
+                onClick={() => handleTogglePermission('support_mode')}
                 className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                  adminPermissions.allowTechSupportMode ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                  adminPermissions.support_mode ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
                 }`}
               >
                 <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
@@ -2292,11 +2326,18 @@ export const AdminPage: React.FC = () => {
               </div>
             </div>
 
-            {/* List of 5 Interactive Permissions Toggles */}
+            {/* List of 7 Interactive Permissions Toggles */}
             <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-                Liste des Permissions Système (Toggles Actifs)
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                  Liste des Permissions Système (Persistées dans localStorage 'admin_permissions')
+                </h3>
+                <span className="text-[11px] text-amber-400 font-medium">
+                  {canManageAdminPermissions(currentUser?.email)
+                    ? '✓ Vous pouvez modifier les permissions'
+                    : '🔒 Modification réservée au DG & Secours'}
+                </span>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* 1. Autoriser appel VoIP */}
                 <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors">
@@ -2305,15 +2346,15 @@ export const AdminPage: React.FC = () => {
                       <PhoneCall className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white">Autoriser appel VoIP</div>
+                      <div className="text-xs font-bold text-white">Autoriser appel VoIP (voip)</div>
                       <div className="text-[10px] text-neutral-400">Appels vocaux & vidéo WebRTC chiffrés</div>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setAdminPermissions((p) => ({ ...p, allowVoip: !p.allowVoip }))}
+                    onClick={() => handleTogglePermission('voip')}
                     className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                      adminPermissions.allowVoip ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                      adminPermissions.voip ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
                     }`}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
@@ -2327,15 +2368,15 @@ export const AdminPage: React.FC = () => {
                       <Video className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white">Autoriser partage d'écran</div>
+                      <div className="text-xs font-bold text-white">Autoriser partage d'écran (screen_share)</div>
                       <div className="text-[10px] text-neutral-400">Démonstration visuelle en direct</div>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setAdminPermissions((p) => ({ ...p, allowScreenShare: !p.allowScreenShare }))}
+                    onClick={() => handleTogglePermission('screen_share')}
                     className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                      adminPermissions.allowScreenShare ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                      adminPermissions.screen_share ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
                     }`}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
@@ -2349,37 +2390,42 @@ export const AdminPage: React.FC = () => {
                       <Users className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white">Autoriser à voir tous les profils</div>
+                      <div className="text-xs font-bold text-white">Autoriser à voir tous les profils (view_all_profiles)</div>
                       <div className="text-[10px] text-neutral-400">Accès annuaire complet clients & artisans</div>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setAdminPermissions((p) => ({ ...p, allowViewAllProfiles: !p.allowViewAllProfiles }))}
+                    onClick={() => handleTogglePermission('view_all_profiles')}
                     className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                      adminPermissions.allowViewAllProfiles ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                      adminPermissions.view_all_profiles ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
                     }`}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
                   </button>
                 </div>
 
-                {/* 4. Autoriser suppression de compte */}
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors">
+                {/* 4. Autoriser suppression de compte - ROUGE DANGEREUX */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-red-950/40 border-2 border-red-600/70 hover:border-red-500 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
                       <Trash2 className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white">Autoriser suppression de compte</div>
-                      <div className="text-[10px] text-neutral-400">Modération stricte & sanctions profils</div>
+                      <div className="text-xs font-black text-red-400 flex items-center gap-1.5">
+                        <span>Suppression de compte (delete_account)</span>
+                        <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.2 rounded font-mono font-bold uppercase tracking-wider">
+                          DANGEREUX
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-neutral-300">Modération stricte & suppression irréversible</div>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setAdminPermissions((p) => ({ ...p, allowDeleteAccount: !p.allowDeleteAccount }))}
-                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                      adminPermissions.allowDeleteAccount ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                    onClick={() => handleTogglePermission('delete_account')}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer border border-red-500/50 ${
+                      adminPermissions.delete_account ? 'bg-red-600 justify-end' : 'bg-neutral-800 justify-start'
                     }`}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
@@ -2387,21 +2433,65 @@ export const AdminPage: React.FC = () => {
                 </div>
 
                 {/* 5. Autoriser mode support technique */}
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors md:col-span-2">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                       <Phone className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-white">Autoriser mode support technique</div>
+                      <div className="text-xs font-bold text-white">Mode support technique (support_mode)</div>
                       <div className="text-[10px] text-neutral-400">Hotline d’assistance prioritaire en direct</div>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setAdminPermissions((p) => ({ ...p, allowTechSupportMode: !p.allowTechSupportMode }))}
+                    onClick={() => handleTogglePermission('support_mode')}
                     className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                      adminPermissions.allowTechSupportMode ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                      adminPermissions.support_mode ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                  </button>
+                </div>
+
+                {/* 6. Équipe support technique (team_support) */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Équipe support technique (team_support)</div>
+                      <div className="text-[10px] text-neutral-400">Accès pour contactartisanproafrica@gmail.com</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePermission('team_support')}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      adminPermissions.team_support ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                  </button>
+                </div>
+
+                {/* 7. Privilège Fondateur Secours (team_owner) */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-800/80 border border-neutral-700/80 hover:border-neutral-600 transition-colors md:col-span-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <Shield className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Privilège Propriétaire Secours (team_owner)</div>
+                      <div className="text-[10px] text-neutral-400">Accès garanti secours pour adanmitondejunior07@gmail.com</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePermission('team_owner')}
+                    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                      adminPermissions.team_owner ? 'bg-emerald-500 justify-end' : 'bg-neutral-700 justify-start'
                     }`}
                   >
                     <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />

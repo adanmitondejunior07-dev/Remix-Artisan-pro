@@ -17,6 +17,7 @@ import {
   Wallet,
   Globe,
   ShieldCheck,
+  Settings,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import type { PageName } from '../context/AppContext.tsx';
@@ -275,7 +276,18 @@ export const Navbar: React.FC = () => {
               className="w-full px-4 py-2.5 text-left hover:bg-[#2a2a2a] font-medium text-neutral-200 flex items-center gap-2.5 transition-colors cursor-pointer"
             >
               <User className="w-4 h-4 text-neutral-400" />
-              Mon compte & Devis
+              Mon compte & Profil
+            </button>
+
+            <button
+              onClick={() => {
+                go('settings');
+                setUserDropdownOpen(false);
+              }}
+              className="w-full px-4 py-2.5 text-left hover:bg-[#2a2a2a] font-medium text-neutral-200 flex items-center gap-2.5 transition-colors cursor-pointer"
+            >
+              <Settings className="w-4 h-4 text-[#FF6B00]" />
+              Paramètres & Abonnements
             </button>
 
             <button

@@ -59,6 +59,7 @@ export type PageName =
   | 'conditions-monetisation'
   | 'portefeuille'
   | 'admin-paiements'
+  | 'settings'
   | 'notifications';
 
 interface ToastInfo {

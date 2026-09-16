@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   User as UserIcon,
+  Users,
   Shield,
   ShieldAlert,
   Phone,
@@ -38,6 +39,12 @@ import { useApp } from '../context/AppContext.tsx';
 import { api } from '../services/api.ts';
 import type { WithdrawalRequest } from '../types.ts';
 import { isExactAdminEmail, isSuperAdmin } from '../config/adminConfig.ts';
+import {
+  loadAdminPermissions,
+  saveAdminPermissions,
+  canManageAdminPermissions,
+  type SystemAdminPermissions,
+} from '../utils/adminPermissionsStorage.ts';
 import { BecomeArtisanModal } from './BecomeArtisanModal.tsx';
 
 interface DynamicProfileViewProps {
@@ -124,14 +131,41 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
 
   const [linkErrors, setLinkErrors] = useState<{ [key: string]: string }>({});
 
-  // 5 Toggles de permissions administrateur
-  const [adminPermissions, setAdminPermissions] = useState({
-    allowVoip: true,
-    allowScreenShare: true,
-    allowViewAllProfiles: true,
-    allowDeleteAccount: true,
-    allowTechSupportMode: true,
-  });
+  // Toggles de permissions administrateur persistés dans localStorage 'admin_permissions'
+  const [adminPermissions, setAdminPermissions] = useState<SystemAdminPermissions>(() => loadAdminPermissions());
+
+  useEffect(() => {
+    const handlePermsChange = (e: any) => {
+      if (e.detail) setAdminPermissions(e.detail);
+      else setAdminPermissions(loadAdminPermissions());
+    };
+    window.addEventListener('admin_permissions_updated', handlePermsChange);
+    return () => window.removeEventListener('admin_permissions_updated', handlePermsChange);
+  }, []);
+
+  const handleTogglePermission = (key: keyof SystemAdminPermissions) => {
+    const isAllowed = canManageAdminPermissions(currentUser?.email);
+    if (!isAllowed) {
+      showToast({
+        title: 'Accès restreint',
+        desc: 'Seul le Directeur Général ou le Créateur Secours peut modifier les permissions.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    const updated = {
+      ...adminPermissions,
+      [key]: !adminPermissions[key],
+    };
+    saveAdminPermissions(updated);
+    setAdminPermissions(updated);
+    showToast({
+      title: 'Permission sauvegardée',
+      desc: `La permission "${key}" a été enregistrée dans la mémoire du système.`,
+      type: 'success',
+    });
+  };
 
   // Liste locale des comptes bannis (persistée dans localStorage)
   const [bannedUserIds, setBannedUserIds] = useState<string[]>(() => {
@@ -930,12 +964,19 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
                 </div>
               </div>
 
-              {/* LISTE DES 5 PERMISSIONS AVEC TOGGLES CONSERVÉS */}
+              {/* LISTE DES 7 PERMISSIONS AVEC TOGGLES PERSISTÉS */}
               <div className="space-y-3 pt-2">
-                <h3 className="text-xs font-black uppercase tracking-wider text-neutral-400 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-blue-400" />
-                  <span>Permissions & Privilèges Système :</span>
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-blue-400" />
+                    <span>Permissions & Privilèges Système :</span>
+                  </h3>
+                  <span className="text-[11px] text-amber-400 font-medium">
+                    {canManageAdminPermissions(currentUser?.email)
+                      ? '✓ Sauvegardé en mémoire'
+                      : '🔒 Réservé DG & Secours'}
+                  </span>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* 1. Autoriser appel VoIP */}
@@ -953,11 +994,9 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        setAdminPermissions((p) => ({ ...p, allowVoip: !p.allowVoip }))
-                      }
+                      onClick={() => handleTogglePermission('voip')}
                       className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                        adminPermissions.allowVoip
+                        adminPermissions.voip
                           ? 'bg-emerald-500 justify-end'
                           : 'bg-neutral-700 justify-start'
                       }`}
@@ -983,14 +1022,9 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        setAdminPermissions((p) => ({
-                          ...p,
-                          allowScreenShare: !p.allowScreenShare,
-                        }))
-                      }
+                      onClick={() => handleTogglePermission('screen_share')}
                       className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                        adminPermissions.allowScreenShare
+                        adminPermissions.screen_share
                           ? 'bg-emerald-500 justify-end'
                           : 'bg-neutral-700 justify-start'
                       }`}
@@ -1016,14 +1050,9 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        setAdminPermissions((p) => ({
-                          ...p,
-                          allowViewAllProfiles: !p.allowViewAllProfiles,
-                        }))
-                      }
+                      onClick={() => handleTogglePermission('view_all_profiles')}
                       className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                        adminPermissions.allowViewAllProfiles
+                        adminPermissions.view_all_profiles
                           ? 'bg-emerald-500 justify-end'
                           : 'bg-neutral-700 justify-start'
                       }`}
@@ -1032,33 +1061,31 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
                     </button>
                   </div>
 
-                  {/* 4. Autoriser suppression de compte */}
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors">
+                  {/* 4. Autoriser suppression de compte - ROUGE DANGEREUX */}
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-red-950/40 border-2 border-red-600/70 hover:border-red-500 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-sm">
                         <Trash2 className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-white">
-                          Autoriser suppression de compte
+                        <div className="text-xs font-black text-red-400 flex items-center gap-1.5">
+                          <span>Suppression de compte</span>
+                          <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.2 rounded font-mono font-bold uppercase tracking-wider">
+                            DANGEREUX
+                          </span>
                         </div>
-                        <div className="text-[10px] text-neutral-400">
-                          Modération et sanctions sévères
+                        <div className="text-[10px] text-neutral-300">
+                          Modération et sanctions sévères irréversibles
                         </div>
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        setAdminPermissions((p) => ({
-                          ...p,
-                          allowDeleteAccount: !p.allowDeleteAccount,
-                        }))
-                      }
-                      className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                        adminPermissions.allowDeleteAccount
-                          ? 'bg-emerald-500 justify-end'
-                          : 'bg-neutral-700 justify-start'
+                      onClick={() => handleTogglePermission('delete_account')}
+                      className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer border border-red-500/50 ${
+                        adminPermissions.delete_account
+                          ? 'bg-red-600 justify-end'
+                          : 'bg-neutral-800 justify-start'
                       }`}
                     >
                       <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
@@ -1066,7 +1093,7 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
                   </div>
 
                   {/* 5. Autoriser mode support technique */}
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors md:col-span-2">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
                         <Headphones className="w-4 h-4" />
@@ -1082,14 +1109,65 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        setAdminPermissions((p) => ({
-                          ...p,
-                          allowTechSupportMode: !p.allowTechSupportMode,
-                        }))
-                      }
+                      onClick={() => handleTogglePermission('support_mode')}
                       className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
-                        adminPermissions.allowTechSupportMode
+                        adminPermissions.support_mode
+                          ? 'bg-emerald-500 justify-end'
+                          : 'bg-neutral-700 justify-start'
+                      }`}
+                    >
+                      <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                    </button>
+                  </div>
+
+                  {/* 6. Équipe support technique */}
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white">
+                          Équipe support technique
+                        </div>
+                        <div className="text-[10px] text-neutral-400">
+                          Accès assistance technique aux tickets
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePermission('team_support')}
+                      className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                        adminPermissions.team_support
+                          ? 'bg-emerald-500 justify-end'
+                          : 'bg-neutral-700 justify-start'
+                      }`}
+                    >
+                      <span className="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform" />
+                    </button>
+                  </div>
+
+                  {/* 7. Privilège Fondateur Secours */}
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors md:col-span-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                        <Shield className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white">
+                          Privilège Fondateur Secours
+                        </div>
+                        <div className="text-[10px] text-neutral-400">
+                          Accès garanti secours pour adanmitondejunior07@gmail.com
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePermission('team_owner')}
+                      className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+                        adminPermissions.team_owner
                           ? 'bg-emerald-500 justify-end'
                           : 'bg-neutral-700 justify-start'
                       }`}

@@ -8,16 +8,17 @@ import type { AdminRecord } from './types.ts';
 export const OFFICIAL_APP_EMAIL = 'contactartisanproafrica@gmail.com';
 export const SUPPORT_EMAIL = 'contactartisanproafrica@gmail.com';
 
-// 1. Admin Principal & 2. Admin Secondaire & 3. Email Officiel du Fondateur
-export const PRIMARY_ADMIN_EMAIL = 'contactartisanproafrica@gmail.com';
+// 1. Admin Principal (DG) & 2. Admin Secondaire & 3. Support Technique
+export const PRIMARY_ADMIN_EMAIL = 'artisanproafrique@gmail.com';
 export const SECONDARY_ADMIN_EMAIL = 'adanmitondejunior07@gmail.com';
-export const FOUNDER_EMAIL = 'artisanpro.afrique@gmail.com';
+export const FOUNDER_EMAIL = 'artisanproafrique@gmail.com';
 
 // Les trois super admins fondateurs officiels
 export const superAdmins: string[] = [
-  'adanmitondejunior07@gmail.com',
+  'artisanproafrique@gmail.com',
   'artisanpro.afrique@gmail.com',
   'contactartisanproafrica@gmail.com',
+  'adanmitondejunior07@gmail.com',
 ];
 
 // Les trois emails officiels SUPER ADMINISTRATION autorisés à retirer les Revenus Plateforme Fondateur
@@ -31,6 +32,8 @@ const envAdminEmails =
 
 export const ADMIN_EMAILS: string[] = Array.from(
   new Set([
+    'artisanproafrique@gmail.com',
+    'artisanpro.afrique@gmail.com',
     PRIMARY_ADMIN_EMAIL,
     SECONDARY_ADMIN_EMAIL,
     FOUNDER_EMAIL,

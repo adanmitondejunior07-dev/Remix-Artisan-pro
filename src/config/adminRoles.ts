@@ -12,27 +12,27 @@ export interface AdminAfricaProfile {
 
 export const admins: AdminAfricaProfile[] = [
   {
-    email: "artisanpro.afrique@gmail.com",
+    email: "artisanproafrique@gmail.com",
     role: "DIRECTION_GENERALE",
-    nom: "Admin Direction Générale",
-    acces: "COMPLET - Boss",
-    description: "Direction et gouvernance complète de la plateforme. Supervision générale de tous les modules.",
+    nom: "DG DIRECTEUR GÉNÉRAL PRINCIPAL",
+    acces: "CONTRÔLE TOTAL - Patron Suprême",
+    description: "Direction et gouvernance complète de l'application. Peut TOUT voir, TOUT gérer, TOUT activer/désactiver. Patron suprême de l'app.",
     defaultTab: "direction_tout"
   },
   {
     email: "contactartisanproafrica@gmail.com", 
-    role: "ADMIN_RETRAITS",
-    nom: "Admin Vérif Retraits",
-    acces: "COMPLET + Focus Retraits",
-    description: "Validation et vérification prioritaire des demandes de retraits Mobile Money des artisans.",
+    role: "SUPPORT_TECHNIQUE",
+    nom: "SUPPORT TECHNIQUE & CLIENT",
+    acces: "SUPPORT CLIENT STRICT",
+    description: "Peut seulement voir messages et aider clients. Ne voit pas mots de passe, ne peut pas supprimer compte.",
     defaultTab: "retraits_a_verifier"
   },
   {
     email: "adanmitondejunior07@gmail.com",
-    role: "CONTROLE_CENTRAL",
-    nom: "Admin Contrôle Central",
-    acces: "COMPLET + Technique CinetPay",
-    description: "Contrôle technique central, intégration CinetPay, monitoring des passerelles et analyse des logs.",
+    role: "CONTROLE_TOTAL_SECOURS",
+    nom: "Créateur / Contrôle Total Secours",
+    acces: "CONTRÔLE TOTAL SECOURS",
+    description: "Créateur / Contrôle Total Secours. Clé de secours si le DG perd l'accès à son compte.",
     defaultTab: "technique_cinetpay"
   }
 ];
@@ -41,9 +41,9 @@ export const admins: AdminAfricaProfile[] = [
 export function getDashboard(email?: string | null): string {
   if (!email) return "Accès refusé";
   const normalized = email.trim().toLowerCase();
-  if (normalized === "artisanpro.afrique@gmail.com") return "Dashboard Direction - Tout";
-  if (normalized === "contactartisanproafrica@gmail.com") return "Dashboard Retraits - A vérifier";
-  if (normalized === "adanmitondejunior07@gmail.com") return "Dashboard Technique - CinetPay + Logs";
+  if (normalized === "artisanproafrique@gmail.com" || normalized === "artisanpro.afrique@gmail.com") return "Dashboard Direction Générale - Tout";
+  if (normalized === "contactartisanproafrica@gmail.com") return "Dashboard Support Technique";
+  if (normalized === "adanmitondejunior07@gmail.com") return "Dashboard Créateur / Contrôle Total Secours";
   return "Accès refusé";
 }
 
@@ -53,6 +53,9 @@ export function getDashboard(email?: string | null): string {
 export function getAdminAfricaProfile(email?: string | null): AdminAfricaProfile | undefined {
   if (!email) return undefined;
   const normalized = email.trim().toLowerCase();
+  if (normalized === "artisanpro.afrique@gmail.com") {
+    return admins.find((a) => a.email === "artisanproafrique@gmail.com");
+  }
   return admins.find((a) => a.email.toLowerCase() === normalized);
 }
 
@@ -62,5 +65,6 @@ export function getAdminAfricaProfile(email?: string | null): AdminAfricaProfile
 export function isAuthorizedAfricaAdmin(email?: string | null): boolean {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
+  if (normalized === "artisanpro.afrique@gmail.com") return true;
   return admins.some((a) => a.email.toLowerCase() === normalized);
 }

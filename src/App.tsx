@@ -28,6 +28,7 @@ import { MonetizationConditionsPage } from './components/MonetizationConditionsP
 import { NotificationsPage } from './components/NotificationsPage.tsx';
 import { PortefeuilleComplet } from './components/PortefeuilleComplet.tsx';
 import { AdminPaymentsPage } from './components/AdminPaymentsPage.tsx';
+import { SettingsPage } from './components/SettingsPage.tsx';
 import { AuthGate } from './components/AuthGate.tsx';
 import { QuoteModal } from './components/Modals/QuoteModal.tsx';
 import { PaymentModal } from './components/Modals/PaymentModal.tsx';
@@ -200,6 +201,8 @@ const AppContent: React.FC = () => {
         return <MonetizationConditionsPage />;
       case 'notifications':
         return <NotificationsPage />;
+      case 'settings':
+        return <SettingsPage />;
       case 'portefeuille':
         return (
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -114,10 +114,10 @@ export const AccountPage: React.FC = () => {
   const [newArticle, setNewArticle] = useState({
     title: '',
     category: currentArtisan?.trade || 'Couture',
-    price: '15 000 FCFA',
-    duration: '24h - 48h',
+    price: '',
+    duration: '',
     description: '',
-    emoji: '🧵',
+    emoji: '✨',
   });
 
   // File input refs for uploading photos directly from device / phone gallery
@@ -327,8 +327,10 @@ export const AccountPage: React.FC = () => {
 
     setIsSubmittingArticle(true);
     try {
-      const priceNum = parseInt(newArticle.price.replace(/\D/g, ''), 10) || 15000;
-      const formattedPrice = newArticle.price.includes('FCFA') ? newArticle.price : `${newArticle.price} FCFA`;
+      const priceNum = parseInt(newArticle.price.replace(/\D/g, ''), 10) || 0;
+      const formattedPrice = newArticle.price.trim()
+        ? (newArticle.price.includes('FCFA') ? newArticle.price : `${newArticle.price} FCFA`)
+        : 'Sur devis';
 
       await api.createService({
         artisanId: currentArtisan?.id || 1,
@@ -350,10 +352,10 @@ export const AccountPage: React.FC = () => {
       setNewArticle({
         title: '',
         category: currentArtisan?.trade || 'Couture',
-        price: '15 000 FCFA',
-        duration: '24h - 48h',
+        price: '',
+        duration: '',
         description: '',
-        emoji: '🧵',
+        emoji: '✨',
       });
       showToast({
         title: 'Article publié !',
@@ -532,10 +534,21 @@ export const AccountPage: React.FC = () => {
             </div>
 
             {/* Direct Social Links Badges Overview */}
-            <div className="flex flex-col gap-2 p-3.5 bg-neutral-50 rounded-2xl border border-neutral-200/80 min-w-56 pt-2 md:pt-10">
-              <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
-                Réseaux associés :
-              </span>
+            <div className="flex flex-col gap-2 p-3.5 bg-neutral-50 rounded-2xl border border-neutral-200/80 min-w-56 pt-2 md:pt-6">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                  Réseaux associés :
+                </span>
+                <button
+                  type="button"
+                  id="btn-account-goto-settings"
+                  onClick={() => go('settings')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-orange-50 text-[#FF6B00] hover:bg-orange-100 font-bold text-xs border border-orange-200 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Paramètres</span>
+                </button>
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {/* WhatsApp Badge */}
                 <span
@@ -871,12 +884,12 @@ export const AccountPage: React.FC = () => {
 
           <button
             type="button"
-            id="tab-btn-abonnements"
-            onClick={() => go('abonnements')}
-            className="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-colors whitespace-nowrap bg-neutral-900 text-amber-400 hover:bg-neutral-800 border border-neutral-700 cursor-pointer"
+            id="tab-btn-parametres"
+            onClick={() => go('settings')}
+            className="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-colors whitespace-nowrap bg-orange-50 text-[#FF6B00] hover:bg-orange-100 border border-orange-200 cursor-pointer"
           >
-            <Sparkles className="w-4 h-4 text-[#FF6B00]" />
-            <span>Formules & Abonnements</span>
+            <Settings className="w-4 h-4 text-[#FF6B00]" />
+            <span>Paramètres & Abonnements</span>
           </button>
 
           <button
@@ -1777,7 +1790,7 @@ export const AccountPage: React.FC = () => {
                       required
                       value={newArticle.price}
                       onChange={(e) => setNewArticle({ ...newArticle, price: e.target.value })}
-                      placeholder="Ex: 25 000 FCFA"
+                      placeholder="Écrivez votre prix (ex: 25 000 FCFA)"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                     />
                   </div>

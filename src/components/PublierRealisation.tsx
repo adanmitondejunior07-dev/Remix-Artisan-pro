@@ -32,10 +32,8 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
   const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo');
   const [mediaUrl, setMediaUrl] = useState<string>('');
   const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
-  const [tarif, setTarif] = useState<string>('20 000 FCFA');
-  const [description, setDescription] = useState<string>(
-    'Création artisanale de qualité, soignée et sur-mesure.'
-  );
+  const [tarif, setTarif] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processingStatus, setProcessingStatus] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');

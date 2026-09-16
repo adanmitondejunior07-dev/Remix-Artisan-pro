@@ -18,6 +18,9 @@ import {
   Pencil,
   Trash2,
   ShoppingCart,
+  Image as ImageIcon,
+  Video,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import type { SocialPost, PostComment } from '../types.ts';
@@ -116,20 +119,23 @@ export const SocialFeed: React.FC = () => {
     setReplyingTo(null);
   };
 
-  // FONCTION SUPPRIMER - ROBUSTE ET IMMÉDIATE POUR TOUS LES UTILISATEURS
+  // FONCTION SUPPRIMER - IMMÉDIATE SANS DÉLAI : DISPARITION INSTANTANÉE
   const supprimerPublication = async (id: string) => {
-    if (!window.confirm("Vraiment supprimer cette publication ?")) return;
-
-    // 1. Suppression visuelle immédiate du DOM (pour que le bouton fonctionne instantanément sans erreur bloquante)
+    // Disparition immédiate et suppression du DOM sans aucun lag
     const elem = document.getElementById('post-' + id);
     if (elem) {
-      elem.style.transition = 'all 0.3s ease';
-      elem.style.opacity = '0';
-      elem.style.transform = 'scale(0.95)';
-      setTimeout(() => elem.remove(), 250);
+      elem.style.display = 'none';
+      elem.remove();
     }
 
-    // 2. Supabase delete si configuré
+    // Suppression instantanée dans le contexte global React
+    try {
+      deleteSocialPost(id);
+    } catch (err) {
+      console.warn('Erreur deleteSocialPost:', err);
+    }
+
+    // Supabase delete en arrière-plan
     if (isSupabaseConfigured() && supabase) {
       try {
         await supabase
@@ -137,18 +143,15 @@ export const SocialFeed: React.FC = () => {
           .delete()
           .eq('id', id);
       } catch (err: any) {
-        console.warn('Erreur Supabase suppression (ignorée pour continuité):', err);
+        console.warn('Erreur Supabase suppression:', err);
       }
     }
 
-    // 3. Suppression dans le context global (Firestore, LocalStorage, state)
-    try {
-      await deleteSocialPost(id);
-      showToast({ title: 'Publication supprimée', desc: 'La publication a été retirée avec succès.', type: 'success' });
-    } catch (err: any) {
-      console.warn('Erreur deleteSocialPost:', err);
-      showToast({ title: 'Publication retirée', desc: 'Retirée de votre fil d’actualité.', type: 'info' });
-    }
+    showToast({
+      title: 'Publication supprimée',
+      desc: 'La publication a disparu immédiatement de votre fil.',
+      type: 'success',
+    });
   };
 
   React.useEffect(() => {
@@ -194,43 +197,69 @@ export const SocialFeed: React.FC = () => {
 
   return (
     <div id="social-feed-container" className="feed-container w-full max-w-[680px] mx-auto px-0 md:px-4 scroll-mt-24">
-      {/* Feed Top Controls */}
-      <div className="flex items-center justify-between bg-white dark:bg-[#1a1a1a] p-4 rounded-none md:rounded-xl border-y md:border border-neutral-200 dark:border-neutral-800 shadow-xs mb-3">
+      {/* Modern Social Feed Top Publisher Box (Style réseau social moderne ArtisanPro) */}
+      <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-xs p-3.5 sm:p-4 mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-[#FF6B00] flex items-center justify-center font-bold text-lg">
-            🔥
-          </div>
-          <div>
-            <h2 className="font-extrabold text-sm sm:text-base text-neutral-900 dark:text-white">
-              Fil d'actualité & Réalisations
-            </h2>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              Publications en direct des artisans et de la communauté
-            </p>
+          {currentUser?.avatarUrl || currentArtisan?.avatarUrl ? (
+            <img
+              src={currentUser?.avatarUrl || currentArtisan?.avatarUrl}
+              alt="Avatar"
+              className="w-10 h-10 rounded-full object-cover border border-neutral-200 shrink-0"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-[#FF6B00]/10 text-[#FF6B00] flex items-center justify-center font-bold text-sm shrink-0">
+              {currentUser?.name?.slice(0, 2).toUpperCase() || 'AP'}
+            </div>
+          )}
+          <div
+            onClick={() => {
+              if (currentUser?.role === 'artisan' && isSubscriptionExpired) {
+                showToast({
+                  title: 'Abonnement expiré',
+                  desc: 'Votre formule a expiré. Veuillez la renouveler pour publier une réalisation.',
+                  type: 'warning',
+                });
+                go('abonnements');
+                return;
+              }
+              setIsCreatingPost(true);
+            }}
+            className="flex-1 px-4 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200/70 text-neutral-500 text-xs sm:text-sm font-medium cursor-pointer transition-colors flex items-center justify-between"
+          >
+            <span>Partagez une réalisation, un tarif ou une actualité...</span>
+            <Sparkles className="w-4 h-4 text-[#FF6B00] shrink-0 ml-2" />
           </div>
         </div>
 
-        {/* Action button: Publier */}
-        <button
-          type="button"
-          onClick={() => {
-            if (currentUser?.role === 'artisan' && isSubscriptionExpired) {
-              showToast({
-                title: 'Abonnement expiré',
-                desc: 'Votre formule a expiré. Veuillez la renouveler pour publier une réalisation.',
-                type: 'warning',
-              });
-              go('abonnements');
-              return;
-            }
-            setIsCreatingPost(true);
-          }}
-          className="px-4 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" />
-          <span className="hidden sm:inline">Publier une création</span>
-          <span className="sm:hidden">Publier</span>
-        </button>
+        <div className="flex items-center justify-between pt-3 mt-3 border-t border-neutral-100 text-xs text-neutral-600">
+          <button
+            type="button"
+            onClick={() => setIsCreatingPost(true)}
+            className="flex-1 py-1.5 px-2 rounded-xl hover:bg-neutral-100 flex items-center justify-center gap-2 font-bold text-neutral-700 transition-colors cursor-pointer"
+          >
+            <ImageIcon className="w-4 h-4 text-[#FF6B00]" />
+            <span>Photo</span>
+          </button>
+          <div className="w-px h-5 bg-neutral-200"></div>
+          <button
+            type="button"
+            onClick={() => setIsCreatingPost(true)}
+            className="flex-1 py-1.5 px-2 rounded-xl hover:bg-neutral-100 flex items-center justify-center gap-2 font-bold text-neutral-700 transition-colors cursor-pointer"
+          >
+            <Video className="w-4 h-4 text-emerald-600" />
+            <span>Vidéo (30s max)</span>
+          </button>
+          <div className="w-px h-5 bg-neutral-200"></div>
+          <button
+            type="button"
+            onClick={() => setIsCreatingPost(true)}
+            className="flex-1 py-1.5 px-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white flex items-center justify-center gap-1.5 font-bold transition-colors cursor-pointer shadow-2xs"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+            <span>Publier</span>
+          </button>
+        </div>
       </div>
 
       {/* Floating '+' Button */}
@@ -338,23 +367,12 @@ export const SocialFeed: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => supprimerPublication(post.id)}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      background: '#FEE2E2',
-                      color: '#DC2626',
-                      border: 'none',
-                      fontSize: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                    }}
+                    className="h-8 px-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-bold border border-red-200 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
                     title="Supprimer la publication"
                     aria-label="Supprimer la publication"
                   >
-                    🗑️
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Supprimer</span>
                   </button>
                 </div>
               </div>

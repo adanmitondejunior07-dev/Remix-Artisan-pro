@@ -251,9 +251,9 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
               </button>
 
               <button
-                onClick={() => handleNavigate('account')}
+                onClick={() => handleNavigate('settings')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-semibold transition-colors cursor-pointer ${
-                  page === 'account'
+                  page === 'settings'
                     ? 'bg-orange-50 text-[#FF6B00]'
                     : 'text-neutral-800 hover:bg-[#F3F4F6] active:bg-[#E5E7EB]'
                 }`}
