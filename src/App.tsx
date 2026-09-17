@@ -184,7 +184,7 @@ const AppContent: React.FC = () => {
       case 'admin-login':
         return <AdminLoginPage />;
       case 'dynamic-profile':
-        return <DynamicProfileView onOpenAdminDashboard={() => go('admin')} />;
+        return <ProfilePage />;
       case 'about':
         return <AboutPage />;
       case 'privacy':

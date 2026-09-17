@@ -289,13 +289,24 @@ export const Navbar: React.FC = () => {
 
             <button
               onClick={() => {
+                go('profile');
+                setUserDropdownOpen(false);
+              }}
+              className="w-full px-4 py-2.5 text-left hover:bg-[#2a2a2a] font-medium text-neutral-200 flex items-center gap-2.5 transition-colors cursor-pointer"
+            >
+              <User className="w-4 h-4 text-[#FF6B00]" />
+              Mon Profil
+            </button>
+
+            <button
+              onClick={() => {
                 go('account');
                 setUserDropdownOpen(false);
               }}
               className="w-full px-4 py-2.5 text-left hover:bg-[#2a2a2a] font-medium text-neutral-200 flex items-center gap-2.5 transition-colors cursor-pointer"
             >
-              <User className="w-4 h-4 text-neutral-400" />
-              Mon compte & Profil
+              <Settings className="w-4 h-4 text-neutral-400" />
+              Paramètres du compte
             </button>
 
             <button

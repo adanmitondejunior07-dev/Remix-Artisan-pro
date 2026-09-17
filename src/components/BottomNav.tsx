@@ -150,7 +150,7 @@ export const BottomNav: React.FC = () => {
           /* Si role=ARTISAN : "Devenir Artisan" est supprimé et remplacé par "Profil" artisan */
           <button
             type="button"
-            onClick={() => go('account')}
+            onClick={() => go('profile')}
             className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all duration-150 min-w-[60px] cursor-pointer ${
               isProfileActive
                 ? 'text-[#FF7A00] font-bold'
@@ -204,7 +204,7 @@ export const BottomNav: React.FC = () => {
         {!isArtisan && (
           <button
             type="button"
-            onClick={() => go('account')}
+            onClick={() => go('profile')}
             className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-150 min-w-[56px] cursor-pointer ${
               isProfileActive
                 ? 'text-[#FF7A00] font-bold'

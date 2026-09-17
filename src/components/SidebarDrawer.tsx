@@ -17,6 +17,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
     page,
     go,
     currentUser,
+    currentArtisan,
     unreadNotifsCount,
     logout,
     supportModal,
@@ -65,6 +66,15 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
   const initialLetter = (currentUser?.name || 'Junior Artisan').trim()[0]?.toUpperCase() || 'J';
   const displayCity = currentUser?.city || 'Abidjan';
   const notifCount = unreadNotifsCount > 0 ? unreadNotifsCount : 3;
+  const isVerified = Boolean(
+    currentUser?.verified ||
+    currentUser?.is_verified ||
+    currentArtisan?.verified ||
+    currentArtisan?.is_verified ||
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'super_admin' ||
+    isSuperAdmin(currentUser)
+  );
 
   return (
     <>
@@ -106,11 +116,13 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
                 {currentUser?.name || 'Junior Artisan'}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="bg-[#DBEAFE] text-[#2563EB] px-2 py-0.5 rounded-full text-[11px] font-bold tracking-tight">
-                  ✅ Vérifié
-                </span>
+                {isVerified && (
+                  <span className="bg-orange-50 text-[#FF6B00] border border-orange-200 px-2 py-0.5 rounded-full text-[11px] font-bold tracking-tight">
+                    ✓ Vérifié
+                  </span>
+                )}
                 <span className="text-xs text-[#6B7280] font-medium truncate">
-                  • {displayCity}
+                  {isVerified ? `• ${displayCity}` : displayCity}
                 </span>
               </div>
             </div>

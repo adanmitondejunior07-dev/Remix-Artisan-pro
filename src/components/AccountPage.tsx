@@ -57,7 +57,7 @@ import {
 } from '../data/profileBanners.ts';
 import { MonetizationView } from './MonetizationView.tsx';
 import { AdminPage } from './AdminPage.tsx';
-import { DynamicProfileView } from './DynamicProfileView.tsx';
+import { ProfilePage } from './ProfilePage.tsx';
 import { BecomeArtisanModal } from './BecomeArtisanModal.tsx';
 import { Wallet, Shield } from 'lucide-react';
 import { isExactAdminEmail, isSuperAdmin } from '../config/adminConfig.ts';
@@ -816,12 +816,12 @@ export const AccountPage: React.FC = () => {
             onClick={() => setActiveTab('dynamic_profile')}
             className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'dynamic_profile'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-2 ring-blue-400'
-                : 'bg-neutral-900 text-blue-400 hover:bg-neutral-800 border border-neutral-700'
+                ? 'bg-[#FF6B00] text-white shadow-md shadow-orange-600/30 ring-2 ring-[#FF6B00]'
+                : 'bg-neutral-900 text-neutral-200 hover:bg-neutral-800 border border-neutral-700'
             }`}
           >
-            <Shield className="w-4 h-4 text-blue-400" />
-            <span>Page Profil Dynamique (Client / Pro / Admin)</span>
+            <UserIcon className="w-4 h-4 text-[#FF6B00]" />
+            <span>Mon Profil (Nouveau)</span>
           </button>
 
           <button
@@ -1136,9 +1136,11 @@ export const AccountPage: React.FC = () => {
           </div>
         )}
 
-        {/* TAB DYNAMIQUE: PAGE PROFIL DYNAMIQUE (Client / Artisan / Admin) */}
+        {/* TAB DYNAMIQUE: NOUVEAU PROFIL ARTISANPRO MODERNE (Réseau Social) */}
         {activeTab === 'dynamic_profile' && (
-          <DynamicProfileView onOpenAdminDashboard={() => setActiveTab('admin')} />
+          <div className="pt-2">
+            <ProfilePage />
+          </div>
         )}
 
         {/* TAB 1: FORMULAIRE DE PROFIL & RÉSEAUX SOCIAUX ("Sur bon forme") */}

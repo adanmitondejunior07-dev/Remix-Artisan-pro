@@ -1,10 +1,11 @@
 import React from 'react';
+import { User } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { useLang } from '../LangContext.tsx';
 import { paysAfricains } from '../data/langues.ts';
 
 export const DesktopLeftSidebar: React.FC = () => {
-  const { page, go, paysSelectionne, changerLangue } = useApp();
+  const { page, go, currentUser, paysSelectionne, changerLangue } = useApp();
   const { t, lang, changeLang } = useLang();
 
   const currentPaysObj =
@@ -24,6 +25,17 @@ export const DesktopLeftSidebar: React.FC = () => {
           >
             {t.accueil}
           </div>
+          {currentUser && (
+            <div
+              onClick={() => go('profile')}
+              className={`p-3 rounded-lg cursor-pointer transition-colors font-semibold text-sm flex items-center gap-2.5 ${
+                page === 'profile' ? 'bg-orange-100 text-orange-600 font-bold' : 'text-neutral-700 hover:bg-neutral-100'
+              }`}
+            >
+              <User className="w-4 h-4 text-[#FF6B00]" />
+              <span>Mon Profil</span>
+            </div>
+          )}
           <div
             onClick={() => go('market')}
             className={`p-3 rounded-lg cursor-pointer transition-colors font-semibold text-sm ${
