@@ -35,6 +35,7 @@ import {
   Briefcase,
   AlertTriangle,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { isSuperAdmin } from '../config/adminConfig.ts';
@@ -68,6 +69,7 @@ export const ProfilePage: React.FC = () => {
     followingArtisans,
     toggleFollowArtisan,
     updateUserProfile,
+    updateProfileName,
     uploadProfilePhoto,
     uploadCoverPhoto,
     refreshData,
@@ -201,6 +203,27 @@ export const ProfilePage: React.FC = () => {
   const [editFacebook, setEditFacebook] = useState(targetFacebook);
   const [editTiktok, setEditTiktok] = useState(targetTiktok);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // État pour modification ultra-rapide du nom (1 clic / inline)
+  const [isQuickEditingName, setIsQuickEditingName] = useState(false);
+  const [quickNameInput, setQuickNameInput] = useState(targetName);
+
+  useEffect(() => {
+    setQuickNameInput(targetName);
+    setEditName(targetName);
+  }, [targetName]);
+
+  const handleQuickSaveName = async (e?: React.FormEvent) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const newName = quickNameInput.trim();
+    if (!newName) return;
+    if (selectedArtisan) {
+      selectedArtisan.name = newName;
+    }
+    setEditName(newName);
+    setIsQuickEditingName(false);
+    await updateProfileName(newName);
+  };
 
   // Historique d'appels VoIP (pour artisan)
   const [callHistory, setCallHistory] = useState<CallRecord[]>([]);
@@ -613,6 +636,18 @@ export const ProfilePage: React.FC = () => {
                             <ImageIcon className="w-4 h-4 text-neutral-600" />
                             <span>Modifier la couverture</span>
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsMenuOpen(false);
+                              setQuickNameInput(targetName);
+                              setIsQuickEditingName(true);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-orange-50 text-[#FF6B00] flex items-center gap-2 font-bold cursor-pointer"
+                          >
+                            <Pencil className="w-4 h-4 text-[#FF6B00]" />
+                            <span>Modifier mon nom (rapide)</span>
+                          </button>
                           <div className="my-1 border-t border-neutral-100" />
                           <button
                             type="button"
@@ -733,19 +768,66 @@ export const ProfilePage: React.FC = () => {
             {/* Nom, Métier, Ville, Badge (Règle 2) */}
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
-                  {targetName}
-                </h1>
-                {isActuallyVerified && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Vérifié</span>
-                  </span>
-                )}
-                {isTargetingArtisan && selectedArtisan?.plan && (
-                  <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-orange-50 text-[#FF6B00] border border-orange-200">
-                    {selectedArtisan.plan}
-                  </span>
+                {isQuickEditingName ? (
+                  <form onSubmit={handleQuickSaveName} className="flex items-center gap-1.5 flex-wrap py-1">
+                    <input
+                      type="text"
+                      autoFocus
+                      required
+                      value={quickNameInput}
+                      onChange={(e) => setQuickNameInput(e.target.value)}
+                      placeholder="Votre nom"
+                      className="px-3 py-1 text-base sm:text-lg font-black text-neutral-900 border-2 border-[#FF6B00] rounded-xl focus:outline-none bg-white shadow-xs min-w-[200px]"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3.5 py-1.5 bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold rounded-xl shadow-xs transition-transform active:scale-95 cursor-pointer flex items-center gap-1"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Enregistrer</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickNameInput(targetName);
+                        setIsQuickEditingName(false);
+                      }}
+                      className="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                    >
+                      Annuler
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <h1 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+                      <span>{targetName}</span>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickNameInput(targetName);
+                            setIsQuickEditingName(true);
+                          }}
+                          className="p-1 rounded-lg bg-neutral-100 hover:bg-orange-100 text-neutral-600 hover:text-[#FF6B00] transition-colors cursor-pointer shadow-2xs group"
+                          title="Modifier le nom rapidement (1 clic)"
+                          aria-label="Modifier le nom rapidement"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-neutral-500 group-hover:text-[#FF6B00]" />
+                        </button>
+                      )}
+                    </h1>
+                    {isActuallyVerified && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Vérifié</span>
+                      </span>
+                    )}
+                    {isTargetingArtisan && selectedArtisan?.plan && (
+                      <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-orange-50 text-[#FF6B00] border border-orange-200">
+                        {selectedArtisan.plan}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -1375,12 +1457,12 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-neutral-700 mb-1">Métier / Spécialité *</label>
+                <label className="block font-bold text-neutral-700 mb-1">Métier / Spécialité</label>
                 <input
                   type="text"
-                  required
                   value={editTrade}
                   onChange={(e) => setEditTrade(e.target.value)}
+                  placeholder="ex: Menuisier, Couturier, Client..."
                   className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
                 />
               </div>

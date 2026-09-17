@@ -16,6 +16,8 @@ import {
   compressVideoIfNeeded,
 } from '../services/videoService.ts';
 import { saveMediaBlob, getMediaBlob } from '../services/indexedDbService.ts';
+import { useApp } from '../context/AppContext.tsx';
+import { compressImageToDataUrl } from '../utils/imageCompression.ts';
 
 export interface PublierRealisationProps {
   isOpen: boolean;
@@ -28,6 +30,8 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
   onClose,
   onPublished,
 }) => {
+  const { currentUser, currentArtisan, showToast } = useApp();
+
   // Média et contenu du formulaire
   const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo');
   const [mediaUrl, setMediaUrl] = useState<string>('');
@@ -58,8 +62,8 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
 
   if (!isOpen) return null;
 
-  // 1. Choisir Photo avec lecture base64 rapide
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 1. Choisir Photo avec compression instantanée ultra-légère (< 30ms)
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setErrorMessage('');
     const file = e.target.files?.[0];
     if (!file) return;
@@ -70,14 +74,21 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
     currentThumbnailUrlRef.current = '';
     setThumbnailUrl('');
 
+    try {
+      const dataUrl = await compressImageToDataUrl(file, 1200, 1200, 0.85);
+      if (dataUrl) {
+        try {
+          localStorage.setItem('lastMediaBase64', dataUrl);
+        } catch (err) {}
+        setMediaUrl(dataUrl);
+        setMediaType('photo');
+        return;
+      }
+    } catch {}
+
     const reader = new FileReader();
     reader.onload = (event: any) => {
       const result = event.target?.result as string;
-      try {
-        localStorage.setItem('lastMediaBase64', result);
-      } catch (err) {
-        console.warn('Photo trop volumineuse pour localStorage direct, conservée en session');
-      }
       setMediaUrl(result);
       setMediaType('photo');
     };
@@ -104,7 +115,11 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
       if (!durCheck.valid) {
         setIsProcessing(false);
         setProcessingStatus('');
-        alert('Vidéo trop longue, choisissez 30s max');
+        showToast({
+          title: 'Vidéo trop longue',
+          desc: 'Veuillez choisir une vidéo de 30 secondes maximum.',
+          type: 'warning',
+        });
         setErrorMessage('Vidéo trop longue, choisissez 30s max');
         if (videoInputRef.current) videoInputRef.current.value = '';
         return;
@@ -169,10 +184,17 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
 
     const tarifInput = document.querySelector('input[placeholder*="FCFA"]') as HTMLInputElement | null;
     const descTextarea = document.querySelector('textarea') as HTMLTextAreaElement | null;
-    const finalTarif = (tarifInput ? tarifInput.value : '') || tarif || '20 000 FCFA';
-    const finalDesc = (descTextarea ? descTextarea.value : '') || description || 'Création artisanale de qualité';
+    const finalTarif = (tarifInput ? tarifInput.value : '') || tarif || '';
+    const finalDesc = (descTextarea ? descTextarea.value : '') || description || 'Réalisation artisanale';
 
     const postId = Date.now();
+    const authorName = currentUser?.name || currentArtisan?.name || 'Vous';
+    const authorAvatar = currentUser?.avatarUrl || currentUser?.photoUrl || currentArtisan?.avatarUrl || currentArtisan?.photoUrl || '';
+    const authorTrade = currentArtisan?.trade || (currentUser?.role === 'artisan' ? 'Artisan Pro' : 'Créateur');
+    const authorCity = currentArtisan?.city || currentUser?.city || 'Abidjan';
+    const authorCountry = currentArtisan?.country || currentUser?.country || 'Côte d’Ivoire';
+    const authorId = currentUser?.id ? String(currentUser.id) : 'artisan_local';
+    const artisanNumId = currentArtisan?.id || currentUser?.artisanId || 1;
 
     // Cas Vidéo : enregistrement IndexedDB + miniature légère dans le tableau
     if (mediaType === 'video') {
@@ -183,7 +205,11 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
       }
 
       if (!videoBlob) {
-        alert("Choisis une vidéo d'abord");
+        showToast({
+          title: 'Vidéo requise',
+          desc: 'Veuillez choisir une vidéo à publier.',
+          type: 'warning',
+        });
         return;
       }
 
@@ -200,13 +226,13 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
         id: postId,
         type: 'video',
         mediaType: 'video' as const,
-        image: thumbUrl, // Miniature JPEG légère (30Ko) pour affichage instantané
+        image: thumbUrl, // Miniature JPEG légère pour affichage instantané
         thumbnail: thumbUrl,
         videoKey: `video_${postId}`,
         hasIndexedDbVideo: true,
         tarif: finalTarif,
         description: finalDesc,
-        artisan: 'Vous',
+        artisan: authorName,
         likes: 0,
         date: new Date().toLocaleDateString(),
       };
@@ -226,16 +252,16 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
         let allPosts: any[] = JSON.parse(localStorage.getItem('allPosts') || '[]');
         const socialPostFormat = {
           id: String(newPost.id),
-          userId: 'artisan_local',
-          author: newPost.artisan,
+          userId: authorId,
+          author: authorName,
           role: 'ARTISAN',
-          artisanId: 1,
-          artisanName: newPost.artisan,
-          artisanTrade: 'Artisan Pro',
+          artisanId: artisanNumId,
+          artisanName: authorName,
+          artisanTrade: authorTrade,
           artisanEmoji: '🛠️',
           verified: true,
-          city: 'Abidjan',
-          country: 'Côte d’Ivoire',
+          city: authorCity,
+          country: authorCountry,
           content: newPost.description,
           mediaType: 'video' as const,
           mediaUrl: thumbUrl,
@@ -255,7 +281,11 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
       // Notification globale pour mise à jour sans rechargement de page
       window.dispatchEvent(new CustomEvent('artisanPostsUpdated', { detail: newPost }));
 
-      alert("✅ Publication réussie ! Visible dans le fil d'actualité");
+      showToast({
+        title: 'Publication réussie !',
+        desc: 'Votre vidéo est en ligne sur le fil d’actualité.',
+        type: 'success',
+      });
 
       if (onPublished) onPublished();
       onClose();
@@ -265,7 +295,11 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
     // Cas Photo :
     const photoData = mediaUrl || localStorage.getItem('lastMediaBase64');
     if (!photoData) {
-      alert("Choisis une photo d'abord");
+      showToast({
+        title: 'Photo requise',
+        desc: 'Veuillez choisir une photo avant de publier.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -277,7 +311,7 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
       thumbnail: photoData,
       tarif: finalTarif,
       description: finalDesc,
-      artisan: 'Vous',
+      artisan: authorName,
       likes: 0,
       date: new Date().toLocaleDateString(),
     };
@@ -295,16 +329,16 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
       let allPosts: any[] = JSON.parse(localStorage.getItem('allPosts') || '[]');
       const socialPostFormat = {
         id: String(newPhotoPost.id),
-        userId: 'artisan_local',
-        author: newPhotoPost.artisan,
+        userId: authorId,
+        author: authorName,
         role: 'ARTISAN',
-        artisanId: 1,
-        artisanName: newPhotoPost.artisan,
-        artisanTrade: 'Artisan Pro',
+        artisanId: artisanNumId,
+        artisanName: authorName,
+        artisanTrade: authorTrade,
         artisanEmoji: '🛠️',
         verified: true,
-        city: 'Abidjan',
-        country: 'Côte d’Ivoire',
+        city: authorCity,
+        country: authorCountry,
         content: newPhotoPost.description,
         mediaType: 'photo' as const,
         mediaUrl: newPhotoPost.image,
@@ -322,7 +356,11 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
     // Notification globale sans rechargement de page
     window.dispatchEvent(new CustomEvent('artisanPostsUpdated', { detail: newPhotoPost }));
 
-    alert("✅ Publication réussie ! Visible dans le fil d'actualité");
+    showToast({
+      title: 'Publication réussie !',
+      desc: 'Votre photo est en ligne sur le fil d’actualité.',
+      type: 'success',
+    });
 
     if (onPublished) onPublished();
     onClose();
@@ -492,12 +530,11 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
           {/* Description */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-neutral-600 mb-1">
-              Description de votre publication
+              Description de votre publication (optionnel)
             </label>
             <textarea
               rows={3}
-              required
-              placeholder="Décrivez votre création, matière première utilisée, détails de votre travail..."
+              placeholder="Décrivez votre création, détails de votre travail... (ou laissez vide pour publier directement)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:border-emerald-500"

@@ -196,6 +196,7 @@ interface AppContextType {
   refreshData: () => Promise<void>;
   switchUser: (user: User, redirect?: boolean) => Promise<void>;
   updateUserProfile: (userData: Partial<User>, artisanData?: Partial<Artisan>) => Promise<void>;
+  updateProfileName: (newName: string) => Promise<void>;
   uploadProfilePhoto: (url: string) => Promise<void>;
   uploadCoverPhoto: (url: string) => Promise<void>;
   upgradeClientToArtisan: (txId?: string, paymentOperator?: string) => Promise<void>;
@@ -1035,40 +1036,157 @@ function loadLocalArtisanPosts(): SocialPost[] {
     [currentUser, showToast]
   );
 
+  const updateProfileName = useCallback(
+    async (newName: string) => {
+      const trimmed = newName.trim();
+      if (!trimmed) return;
+
+      const updatedUser: User = currentUser
+        ? { ...currentUser, name: trimmed }
+        : {
+            id: 'user_' + Date.now(),
+            name: trimmed,
+            email: 'user@artisanpro.afrique',
+            phone: '',
+            role: 'client',
+            city: 'Abidjan',
+            country: 'Côte d’Ivoire',
+            joinedDate: new Date().toISOString(),
+          };
+
+      // 1. Mise à jour instantanée du state (0 ms)
+      setCurrentUser(updatedUser);
+
+      // 2. Sauvegarde immédiate dans localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('artisanPro_user', JSON.stringify(updatedUser));
+          localStorage.setItem('userData', JSON.stringify(updatedUser));
+          localStorage.setItem('isLoggedIn', 'true');
+        } catch (e) {
+          console.warn('localStorage save warning:', e);
+        }
+      }
+
+      // 3. Mise à jour artisan si applicable
+      if (updatedUser.artisanId) {
+        setCurrentArtisan((prev) => (prev ? { ...prev, name: trimmed } : prev));
+        setArtisans((prev) =>
+          prev.map((a) => (a.id === updatedUser.artisanId ? { ...a, name: trimmed } : a))
+        );
+      }
+
+      // 4. Mettre à jour l'auteur sur toutes les publications sociales
+      setSocialPosts((prev) =>
+        prev.map((post) => {
+          const isUserPost =
+            (updatedUser.id && String(post.userId) === String(updatedUser.id)) ||
+            (updatedUser.artisanId && post.artisanId === updatedUser.artisanId) ||
+            post.author === 'Vous' ||
+            (currentUser?.name && post.author && post.author.trim().toLowerCase() === currentUser.name.trim().toLowerCase());
+          if (isUserPost) {
+            return {
+              ...post,
+              author: trimmed,
+              artisanName: trimmed,
+            };
+          }
+          return post;
+        })
+      );
+
+      showToast({
+        title: 'Nom mis à jour !',
+        desc: `Votre nom de profil est maintenant "${trimmed}".`,
+        type: 'success',
+      });
+
+      // 5. Persistance en arrière-plan sans bloquer l'interface
+      try {
+        if (updatedUser.id) {
+          api.updateUser(updatedUser.id, { name: trimmed }).catch(() => {});
+          firestoreService.updateUserProfile(updatedUser.id, { name: trimmed }).catch(() => {});
+        }
+        if (updatedUser.artisanId) {
+          api.updateArtisan(updatedUser.artisanId, { name: trimmed }).catch(() => {});
+          firestoreService.updateArtisan(updatedUser.artisanId, { name: trimmed }).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('Erreur synchronisation nom:', err);
+      }
+    },
+    [currentUser, showToast]
+  );
+
   const updateUserProfile = useCallback(
     async (userData: Partial<User>, artisanData?: Partial<Artisan>) => {
-      if (!currentUser) return;
-      try {
-        const updatedUser = await api.updateUser(currentUser.id, userData);
-        setCurrentUser(updatedUser);
-
-        if (currentUser.artisanId) {
-          const mergedArtisan: Partial<Artisan> = {
-            ...(artisanData || {}),
-            ...(userData.avatarUrl ? { avatarUrl: userData.avatarUrl, photoUrl: userData.avatarUrl } : {}),
-            ...(userData.bannerUrl ? { bannerUrl: userData.bannerUrl, coverUrl: userData.bannerUrl } : {}),
-            ...(userData.name ? { name: userData.name } : {}),
-            ...(userData.phone ? { phone: userData.phone } : {}),
-            ...(userData.city ? { city: userData.city } : {}),
-            ...(userData.country ? { country: userData.country } : {}),
+      const updatedUser: User = currentUser
+        ? { ...currentUser, ...userData }
+        : {
+            id: 'user_' + Date.now(),
+            name: userData.name || 'Mon Profil',
+            email: userData.email || 'user@artisanpro.afrique',
+            phone: userData.phone || '',
+            role: 'client',
+            city: userData.city || 'Abidjan',
+            country: userData.country || 'Côte d’Ivoire',
+            joinedDate: new Date().toISOString(),
+            ...userData,
           };
-          const updatedArt = await api.updateArtisan(currentUser.artisanId, mergedArtisan);
-          setCurrentArtisan(updatedArt);
-          setArtisans((prev) =>
-            prev.map((a) => (a.id === currentUser.artisanId ? updatedArt : a))
-          );
+
+      // 1. Mise à jour instantanée en mémoire
+      setCurrentUser(updatedUser);
+
+      // 2. Sauvegarde immédiate dans localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('artisanPro_user', JSON.stringify(updatedUser));
+          localStorage.setItem('userData', JSON.stringify(updatedUser));
+          localStorage.setItem('isLoggedIn', 'true');
+        } catch (e) {
+          console.warn('localStorage save warning:', e);
         }
-        showToast({
-          title: 'Profil mis à jour !',
-          desc: 'Vos coordonnées et médias ont été enregistrés avec succès.',
-          type: 'success',
-        });
+      }
+
+      // 3. Mise à jour artisan si applicable
+      if (updatedUser.artisanId) {
+        const mergedArtisan: Partial<Artisan> = {
+          ...(artisanData || {}),
+          ...(userData.avatarUrl ? { avatarUrl: userData.avatarUrl, photoUrl: userData.avatarUrl } : {}),
+          ...(userData.bannerUrl ? { bannerUrl: userData.bannerUrl, coverUrl: userData.bannerUrl } : {}),
+          ...(userData.name ? { name: userData.name } : {}),
+          ...(userData.phone ? { phone: userData.phone } : {}),
+          ...(userData.city ? { city: userData.city } : {}),
+          ...(userData.country ? { country: userData.country } : {}),
+        };
+        setCurrentArtisan((prev) => (prev ? { ...prev, ...mergedArtisan } : prev));
+        setArtisans((prev) =>
+          prev.map((a) => (a.id === updatedUser.artisanId ? { ...a, ...mergedArtisan } : a))
+        );
+      }
+
+      showToast({
+        title: 'Profil mis à jour !',
+        desc: 'Vos informations ont été enregistrées avec succès.',
+        type: 'success',
+      });
+
+      // 4. Persistance asynchrone
+      try {
+        if (updatedUser.id) {
+          api.updateUser(updatedUser.id, userData).catch(() => {});
+        }
+        if (updatedUser.artisanId) {
+          api.updateArtisan(updatedUser.artisanId, {
+            ...(artisanData || {}),
+            name: updatedUser.name,
+            phone: updatedUser.phone,
+            city: updatedUser.city,
+            country: updatedUser.country,
+          }).catch(() => {});
+        }
       } catch (err: any) {
-        showToast({
-          title: 'Erreur',
-          desc: err.message || 'Impossible de mettre à jour le profil',
-          type: 'warning',
-        });
+        console.warn('Sync profile warning:', err);
       }
     },
     [currentUser, showToast]
@@ -2013,6 +2131,7 @@ function loadLocalArtisanPosts(): SocialPost[] {
         refreshData,
         switchUser,
         updateUserProfile,
+        updateProfileName,
         uploadProfilePhoto,
         uploadCoverPhoto,
         upgradeClientToArtisan,

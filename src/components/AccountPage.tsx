@@ -244,7 +244,6 @@ export const AccountPage: React.FC = () => {
     if (formData.phone) {
       const checkTel = formatTelephone(formData.phone);
       if (!checkTel.ok) {
-        alert(checkTel.msg);
         showToast({ title: 'Numéro invalide', desc: checkTel.msg || 'Format de téléphone incorrect', type: 'warning' });
         return;
       }

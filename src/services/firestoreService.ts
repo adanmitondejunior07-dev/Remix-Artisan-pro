@@ -331,6 +331,23 @@ export const firestoreService = {
     }
   },
 
+  async updateUserProfile(id: string | number, data: Partial<User>): Promise<void> {
+    const timestamp = new Date().toISOString();
+    const strId = String(id);
+    const payload = { ...data, updatedAt: timestamp };
+
+    try {
+      await setDoc(doc(firestore, CLIENTS_COL, strId), payload, { merge: true });
+    } catch (err) {
+      console.warn('updateUserProfile clients error:', err);
+    }
+    try {
+      await setDoc(doc(firestore, 'users', strId), payload, { merge: true });
+    } catch (err) {
+      console.warn('updateUserProfile users error:', err);
+    }
+  },
+
   async getClientById(id: string): Promise<User | null> {
     try {
       const docRef = doc(firestore, CLIENTS_COL, id);
