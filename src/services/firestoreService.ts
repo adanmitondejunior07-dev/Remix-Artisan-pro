@@ -771,6 +771,20 @@ export const firestoreService = {
     }
   },
 
+  async updatePublication(postId: string, updates: Partial<SocialPost>): Promise<void> {
+    try {
+      try {
+        const postDocRef = doc(firestore, POSTS_COL, postId);
+        await setDoc(postDocRef, updates, { merge: true });
+      } catch {}
+      const docRef = doc(firestore, PUBLICATIONS_COL, postId);
+      await setDoc(docRef, updates, { merge: true });
+    } catch (err) {
+      console.warn('Firestore updatePublication error:', err);
+      throw err;
+    }
+  },
+
   onPublicationsChange(callback: (posts: SocialPost[]) => void): Unsubscribe {
     try {
       const colRef = collection(firestore, POSTS_COL);

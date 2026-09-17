@@ -271,6 +271,24 @@ export const Navbar: React.FC = () => {
           <div className="py-1 text-xs">
             <button
               onClick={() => {
+                sessionStorage.setItem('open_market_modal', '1');
+                go('market');
+                setUserDropdownOpen(false);
+                setTimeout(() => {
+                  (window as any).openMarketModal?.();
+                }, 120);
+              }}
+              className="w-full px-4 py-2.5 text-left hover:bg-[#2a2a2a] font-bold text-[#FF6B00] flex items-center justify-between transition-colors cursor-pointer border-b border-[#2a2a2a]"
+            >
+              <span className="flex items-center gap-2.5">
+                <ShoppingBag className="w-4 h-4 text-[#FF6B00]" />
+                <span>Vendre un article</span>
+              </span>
+              <span className="text-[10px] bg-[#FF6B00] text-white px-1.5 py-0.5 rounded font-black">Photo</span>
+            </button>
+
+            <button
+              onClick={() => {
                 go('account');
                 setUserDropdownOpen(false);
               }}

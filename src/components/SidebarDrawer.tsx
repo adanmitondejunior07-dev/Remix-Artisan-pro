@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useApp } from '../context/AppContext.tsx';
+import { useLang } from '../LangContext.tsx';
 import type { PageName } from '../context/AppContext.tsx';
 import { isSuperAdmin } from '../config/adminConfig.ts';
 import { paysAfricains } from '../data/langues.ts';
@@ -11,6 +12,7 @@ interface SidebarDrawerProps {
 }
 
 export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose }) => {
+  const { t: tLang, lang, changeLang } = useLang();
   const {
     page,
     go,
@@ -22,8 +24,10 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
     changerLangue,
     paysSelectionne,
     choisirPays,
-    t,
+    t: tApp,
   } = useApp();
+
+  const t = { ...tApp, ...tLang };
 
   // Close on Escape key
   useEffect(() => {
@@ -253,6 +257,28 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
                 <div className="flex-1 min-w-0">
                   <div className="truncate font-bold">Marketplace</div>
                   <div className="text-[11px] text-neutral-500 truncate">Catalogue & Commandes directes</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  sessionStorage.setItem('open_market_modal', '1');
+                  handleNavigate('market');
+                  setTimeout(() => {
+                    (window as any).openMarketModal?.();
+                  }, 120);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-semibold transition-colors cursor-pointer bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 border border-orange-200 text-[#FF6B00]"
+              >
+                <div className="w-9 h-9 rounded-lg bg-[#FF6B00] text-white flex items-center justify-center text-base shrink-0 shadow-2xs">
+                  🏷️
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="truncate font-bold text-neutral-900 flex items-center justify-between">
+                    <span>Vendre un article</span>
+                    <span className="text-[10px] bg-[#FF6B00] text-white font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">Photo</span>
+                  </div>
+                  <div className="text-[11px] text-[#FF6B00] font-medium truncate">Mettre en vente sur la Marketplace</div>
                 </div>
               </button>
 

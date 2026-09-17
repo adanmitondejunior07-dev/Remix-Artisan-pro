@@ -1,10 +1,23 @@
 {
+  "accueil": "Home",
+  "marketplace": "Marketplace",
   "messages": "Messages",
+  "recherche": "Search...",
+  "quoiDeNeuf": "What's new, ",
+  "publierPost": "Create a post",
+  "vendreArticle": "Sell an item",
+  "nomArticle": "Item name",
+  "prix": "Your price",
+  "publier": "Publish",
+  "contacter": "Contact seller",
+  "verif": "Artisan Verification",
+  "comment": "How it works?",
+  "propos": "About",
   "sousTitre": "Find your WhatsApp contacts and chat securely.",
-  "recherche": "Search for a craftsman, a service or a message",
   "statuts": "RECENT STATUSES",
   "ajouter": "Add",
   "artisanPro": "Pro Artisan MS",
   "parametres": "Settings",
-  "langue": "Language"
+  "langue": "Language",
+  "sortir": "Exit"
 }

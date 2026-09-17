@@ -1,9 +1,21 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 export interface Translations {
+  accueil: string;
+  marketplace: string;
   messages: string;
-  sousTitre: string;
   recherche: string;
+  quoiDeNeuf: string;
+  publierPost: string;
+  vendreArticle: string;
+  nomArticle: string;
+  prix: string;
+  publier: string;
+  contacter: string;
+  verif: string;
+  comment: string;
+  propos: string;
+  sousTitre: string;
   statuts: string;
   ajouter: string;
   langue: string;
@@ -17,9 +29,21 @@ export type LangType = 'fr' | 'en';
 
 export const traductions: Record<LangType, Translations> = {
   fr: {
+    accueil: "Accueil",
+    marketplace: "Marketplace",
     messages: "Messages",
+    recherche: "Rechercher...",
+    quoiDeNeuf: "Quoi de neuf, ",
+    publierPost: "Publier un post",
+    vendreArticle: "Vendre un article",
+    nomArticle: "Nom de l'article",
+    prix: "Votre prix",
+    publier: "Publier",
+    contacter: "Contacter le vendeur",
+    verif: "Vérification Artisan",
+    comment: "Comment ça marche?",
+    propos: "À propos",
     sousTitre: "Retrouvez vos contacts WhatsApp et discutez en toute sécurité.",
-    recherche: "Rechercher un artisan, un service ou un message",
     statuts: "STATUTS RÉCENTS",
     ajouter: "Ajouter",
     langue: "Langue",
@@ -29,9 +53,21 @@ export const traductions: Record<LangType, Translations> = {
     parametres: "Paramètres",
   },
   en: {
+    accueil: "Home",
+    marketplace: "Marketplace",
     messages: "Messages",
+    recherche: "Search...",
+    quoiDeNeuf: "What's new, ",
+    publierPost: "Create a post",
+    vendreArticle: "Sell an item",
+    nomArticle: "Item name",
+    prix: "Your price",
+    publier: "Publish",
+    contacter: "Contact seller",
+    verif: "Artisan Verification",
+    comment: "How it works?",
+    propos: "About",
     sousTitre: "Find your WhatsApp contacts and chat securely.",
-    recherche: "Search for a craftsman, a service or a message",
     statuts: "RECENT STATUSES",
     ajouter: "Add",
     langue: "Language",

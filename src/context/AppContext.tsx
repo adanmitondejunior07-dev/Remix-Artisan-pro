@@ -36,7 +36,7 @@ import {
   PERMANENT_OFFICIAL_CHANNELS,
   cleanAndNormalizeLink,
 } from '../utils/channelUtils.ts';
-import { isExactAdminEmail, getAdminUserByEmail } from '../config/adminConfig.ts';
+import { isExactAdminEmail, getAdminUserByEmail, isSuperAdmin } from '../config/adminConfig.ts';
 import { uploadOrStoreMedia } from '../services/mediaStorage.ts';
 import { storage } from '../firebase/config.ts';
 
@@ -112,6 +112,7 @@ interface AppContextType {
   // Social feed & community
   socialPosts: SocialPost[];
   createSocialPost: (data: Partial<SocialPost> & { mediaFile?: File | Blob | null }) => Promise<void>;
+  updateSocialPost: (postId: string, updates: Partial<SocialPost>) => Promise<void>;
   deleteSocialPost: (postId: string) => Promise<void>;
   likeSocialPost: (postId: string) => Promise<void>;
   addPostComment: (postId: string, text: string, parentId?: string | null) => Promise<void>;
@@ -1352,6 +1353,29 @@ function loadLocalArtisanPosts(): SocialPost[] {
   const deleteSocialPost = useCallback(
     async (postId: string) => {
       const targetPost = socialPosts.find((p) => p.id === postId);
+      if (!targetPost) {
+        showToast({ title: 'Publication introuvable', type: 'warning' });
+        return;
+      }
+
+      // VÉRIFICATION DE SÉCURITÉ STRICTE (Règle 12)
+      // Un utilisateur peut uniquement supprimer ses propres publications
+      const isSuperAdm = isSuperAdmin(currentUser);
+      const isPostOwner = Boolean(
+        (currentUser?.id && String(targetPost.userId) === String(currentUser.id)) ||
+        (currentArtisan?.id && (String(targetPost.userId) === String(currentArtisan.id) || targetPost.artisanId === currentArtisan.id)) ||
+        (currentUser?.artisanId && (targetPost.artisanId === currentUser.artisanId || String(targetPost.userId) === String(currentUser.artisanId))) ||
+        (currentUser?.name && targetPost.author && targetPost.author.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+      );
+
+      if (!isPostOwner && !isSuperAdm) {
+        showToast({
+          title: 'Action refusée',
+          desc: "Vous n'avez pas l'autorisation de supprimer cette publication.",
+          type: 'warning',
+        });
+        return;
+      }
 
       // Si média stocké dans Firebase Storage, suppression
       if (targetPost?.storagePath) {
@@ -1407,11 +1431,63 @@ function loadLocalArtisanPosts(): SocialPost[] {
 
       showToast({
         title: 'Publication supprimée',
-        desc: 'La publication a été définitivement supprimée du fil.',
+        desc: 'La publication a été définitivement supprimée.',
         type: 'success',
       });
     },
-    [socialPosts, showToast]
+    [socialPosts, currentUser, currentArtisan, showToast]
+  );
+
+  const updateSocialPost = useCallback(
+    async (postId: string, updates: Partial<SocialPost>) => {
+      const targetPost = socialPosts.find((p) => p.id === postId);
+      if (!targetPost) {
+        showToast({ title: 'Publication introuvable', type: 'warning' });
+        return;
+      }
+
+      // VÉRIFICATION DE SÉCURITÉ STRICTE (Règle 13)
+      const isSuperAdm = isSuperAdmin(currentUser);
+      const isPostOwner = Boolean(
+        (currentUser?.id && String(targetPost.userId) === String(currentUser.id)) ||
+        (currentArtisan?.id && (String(targetPost.userId) === String(currentArtisan.id) || targetPost.artisanId === currentArtisan.id)) ||
+        (currentUser?.artisanId && (targetPost.artisanId === currentUser.artisanId || String(targetPost.userId) === String(currentUser.artisanId))) ||
+        (currentUser?.name && targetPost.author && targetPost.author.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+      );
+
+      if (!isPostOwner && !isSuperAdm) {
+        showToast({
+          title: 'Action refusée',
+          desc: "Vous n'avez pas l'autorisation de modifier cette publication.",
+          type: 'warning',
+        });
+        return;
+      }
+
+      try {
+        await firestoreService.updatePublication(postId, updates);
+      } catch (e) {
+        console.warn('Erreur updatePublication firestore:', e);
+      }
+
+      setSocialPosts((prev) => {
+        const updated = prev.map((p) => (p.id === postId ? { ...p, ...updates } : p));
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('allPosts', JSON.stringify(updated.slice(0, 40)));
+            localStorage.setItem('artisanpro_social_posts', JSON.stringify(updated.slice(0, 40)));
+          } catch {}
+        }
+        return updated;
+      });
+
+      showToast({
+        title: 'Publication modifiée',
+        desc: 'Votre publication a été mise à jour avec succès.',
+        type: 'success',
+      });
+    },
+    [socialPosts, currentUser, currentArtisan, showToast]
   );
 
   const likeSocialPost = useCallback(
@@ -1752,6 +1828,7 @@ function loadLocalArtisanPosts(): SocialPost[] {
         hideToast,
         socialPosts,
         createSocialPost,
+        updateSocialPost,
         deleteSocialPost,
         likeSocialPost,
         addPostComment,

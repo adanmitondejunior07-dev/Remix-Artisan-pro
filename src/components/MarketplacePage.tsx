@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShoppingBag,
   Search,
@@ -84,6 +84,22 @@ export const MarketplacePage: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  // Permet d'ouvrir le modal depuis les menus (Sidebar, Drawer, boutons globaux)
+  useEffect(() => {
+    (window as any).openMarketModal = () => {
+      setIsMarketModalOpen(true);
+    };
+
+    if (sessionStorage.getItem('open_market_modal') === '1') {
+      sessionStorage.removeItem('open_market_modal');
+      setIsMarketModalOpen(true);
+    }
+
+    return () => {
+      delete (window as any).openMarketModal;
+    };
+  }, []);
+
   const categories = ['Tous', 'Couture', 'Électricité', 'Mécanique', 'Coiffure', 'Maçonnerie', 'Menuiserie'];
   const cities = ['Toutes', 'Abidjan', 'Bouaké', 'Yamoussoukro', 'Dakar'];
 
@@ -154,6 +170,14 @@ export const MarketplacePage: React.FC = () => {
     }
     if (!mpPrix.trim()) {
       showToast({ title: 'Champ requis', desc: 'Veuillez renseigner un prix.', type: 'warning' });
+      return;
+    }
+    if (!mpPhoto) {
+      showToast({
+        title: 'Photo obligatoire',
+        desc: 'Veuillez ajouter une photo de votre article avant de publier sur la Marketplace.',
+        type: 'warning',
+      });
       return;
     }
 
@@ -830,99 +854,122 @@ export const MarketplacePage: React.FC = () => {
           if (e.target === e.currentTarget) setIsMarketModalOpen(false);
         }}
       >
-        <div style={{ background: 'white', width: '100%', maxWidth: '480px', borderRadius: '18px', padding: '18px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <b style={{ fontSize: '17px', color: '#111' }}>Publier sur Marketplace</b>
+        <div style={{ background: 'white', width: '100%', maxWidth: '480px', borderRadius: '20px', padding: '20px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f0f0f0', paddingBottom: '12px' }}>
+            <div>
+              <b style={{ fontSize: '18px', color: '#111' }}>Vendre un article 🏷️</b>
+              <p style={{ fontSize: '12px', color: '#666', margin: '2px 0 0 0' }}>Mettre en vente sur la Marketplace</p>
+            </div>
             <button
               type="button"
               onClick={() => setIsMarketModalOpen(false)}
-              style={{ background: '#eee', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}
+              style={{ background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               ✕
             </button>
           </div>
 
-          <form onSubmit={doPublishMarket} style={{ marginTop: '12px' }}>
+          <form onSubmit={doPublishMarket} style={{ marginTop: '14px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
+              Nom de l'article <span style={{ color: '#ef4444' }}>*</span>
+            </label>
             <input
               id="mp_titre"
               value={mpTitre}
               onChange={(e) => setMpTitre(e.target.value)}
-              placeholder="Titre de l'article ou service"
+              placeholder="Ex: Robe Bazin brodée, Fauteuil en rotin..."
               required
-              style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '10px', margin: '8px 0', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '11px 14px', border: '1px solid #d1d5db', borderRadius: '10px', marginBottom: '10px', boxSizing: 'border-box', fontSize: '14px' }}
             />
+
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>
+              Prix de vente en FCFA <span style={{ color: '#ef4444' }}>*</span>
+            </label>
             <input
               id="mp_prix"
               type="number"
               value={mpPrix}
               onChange={(e) => setMpPrix(e.target.value)}
-              placeholder="Prix FCFA (ex: 25000)"
+              placeholder="Ex: 25000"
               required
-              style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '10px', margin: '8px 0', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '11px 14px', border: '1px solid #d1d5db', borderRadius: '10px', marginBottom: '10px', boxSizing: 'border-box', fontSize: '14px' }}
             />
 
-            {/* SELECTION DIRECTE DE PHOTO (PAS BESOIN DE COPIER DE LIEN) */}
-            <div style={{ margin: '8px 0', padding: '10px', border: '1px dashed #CBD5E1', borderRadius: '12px', background: '#F8FAFC' }}>
-              <input
-                ref={mpFileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleMpPhotoDirectSelect(e.target.files[0]);
-                  }
-                }}
-              />
-              {mpPhoto ? (
-                <div style={{ position: 'relative', textAlign: 'center' }}>
-                  <img
-                    src={mpPhoto}
-                    alt="Aperçu direct"
-                    style={{ maxHeight: '140px', maxWidth: '100%', margin: '0 auto', borderRadius: '8px', objectFit: 'cover' }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '6px' }}>
-                    <button
-                      type="button"
-                      onClick={() => mpFileInputRef.current?.click()}
-                      style={{ padding: '4px 10px', fontSize: '11px', background: '#E2E8F0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
-                    >
-                      Changer la photo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMpPhoto('')}
-                      style={{ padding: '4px 10px', fontSize: '11px', background: '#FEE2E2', color: '#DC2626', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => mpFileInputRef.current?.click()}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    background: 'white',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    cursor: 'pointer',
-                    color: '#334155',
-                    fontSize: '13px',
-                    fontWeight: 600,
+            {/* SELECTION DIRECTE DE PHOTO (OBLIGATOIRE) */}
+            <div style={{ margin: '8px 0 12px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>
+                  Photo de l'article <span style={{ color: '#ef4444' }}>*</span>
+                </span>
+                <span style={{ fontSize: '11px', color: '#ea580c', fontWeight: 600 }}>
+                  Obligatoire
+                </span>
+              </div>
+
+              <div style={{ padding: '12px', border: mpPhoto ? '2px solid #22c55e' : '2px dashed #cbd5e1', borderRadius: '12px', background: '#F8FAFC' }}>
+                <input
+                  ref={mpFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleMpPhotoDirectSelect(e.target.files[0]);
+                    }
                   }}
-                >
-                  <Camera className="w-4 h-4 text-[#FF6B00]" />
-                  <span>📷 Choisir une photo direct depuis l'appareil</span>
-                </button>
-              )}
+                />
+                {mpPhoto ? (
+                  <div style={{ position: 'relative', textAlign: 'center' }}>
+                    <img
+                      src={mpPhoto}
+                      alt="Aperçu article"
+                      style={{ maxHeight: '160px', maxWidth: '100%', margin: '0 auto', borderRadius: '10px', objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => mpFileInputRef.current?.click()}
+                        style={{ padding: '5px 12px', fontSize: '12px', background: '#E2E8F0', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        📷 Remplacer la photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMpPhoto('')}
+                        style={{ padding: '5px 12px', fontSize: '12px', background: '#FEE2E2', color: '#DC2626', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        ✕ Supprimer
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => mpFileInputRef.current?.click()}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      background: 'white',
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                      color: '#334155',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Camera className="w-6 h-6 text-[#FF6B00]" />
+                    <span style={{ fontWeight: 700 }}>Prendre ou choisir une photo</span>
+                    <span style={{ fontSize: '11px', color: '#64748B' }}>Format JPEG, PNG, WebP (obligatoire)</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <textarea

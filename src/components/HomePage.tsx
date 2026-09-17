@@ -37,8 +37,6 @@ export const HomePage: React.FC = () => {
     currentUser,
   } = useApp();
 
-  const [isDashboardModalOpen, setIsDashboardModalOpen] = useState<boolean>(false);
-  const [isPublishModalOpen, setIsPublishModalOpen] = useState<boolean>(false);
   const [isMarketplaceModalOpen, setIsMarketplaceModalOpen] = useState<boolean>(false);
 
   const getTradeCountLabel = (tradeLabel: string) => {
@@ -222,35 +220,6 @@ export const HomePage: React.FC = () => {
         </div>
 
         <SocialFeed />
-
-        {/* 1. Boutons Réalisations (Garde seulement 2 petits boutons : "Publier maintenant" et "Publier votre première réalisation") */}
-        <div className="mt-4 mb-8 flex flex-wrap items-center justify-center gap-3 px-4 md:px-0">
-          <button
-            type="button"
-            onClick={() => setIsDashboardModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-[#FF7A00] hover:bg-[#E56E00] text-white font-bold text-xs sm:text-sm shadow-md transition-colors flex items-center gap-2 cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Publier maintenant</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsDashboardModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-[#FFD60A] hover:bg-[#F0C800] text-neutral-900 font-bold text-xs sm:text-sm shadow-md transition-colors flex items-center gap-2 cursor-pointer"
-          >
-            <Layers className="w-4 h-4 text-neutral-800" />
-            <span>Publier votre première réalisation</span>
-          </button>
-        </div>
-
-        {/* Modal Tableau de bord complet (intact, s'ouvre au clic des boutons) */}
-        {isDashboardModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-            <div className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-3xl bg-neutral-950 border border-neutral-800 shadow-2xl p-1">
-              <ArtisanDashboardTable isModal={true} onClose={() => setIsDashboardModalOpen(false)} />
-            </div>
-          </div>
-        )}
       </section>
 
       {/* Métiers populaires */}

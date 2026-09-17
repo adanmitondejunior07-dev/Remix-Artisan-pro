@@ -30,6 +30,7 @@ import { NotificationsPage } from './components/NotificationsPage.tsx';
 import { PortefeuilleComplet } from './components/PortefeuilleComplet.tsx';
 import { AdminPaymentsPage } from './components/AdminPaymentsPage.tsx';
 import { SettingsPage } from './components/SettingsPage.tsx';
+import { DesktopLeftSidebar } from './components/DesktopLeftSidebar.tsx';
 import { AuthGate } from './components/AuthGate.tsx';
 import { QuoteModal } from './components/Modals/QuoteModal.tsx';
 import { PaymentModal } from './components/Modals/PaymentModal.tsx';
@@ -223,8 +224,13 @@ const AppContent: React.FC = () => {
       {!isMessagesPage && <Navbar />}
 
       {/* Main Content Area - feed visible under header */}
-      <main className={`flex-1 w-full max-w-full overflow-x-hidden ${!isMessagesPage ? 'pt-[66px] px-0 md:px-2' : ''} ${isMessagesPage ? 'h-full overflow-hidden' : ''}`}>
-        {renderActivePage()}
+      <main className={`flex-1 w-full max-w-full overflow-x-hidden ${!isMessagesPage ? 'pt-[66px]' : ''} ${isMessagesPage ? 'h-full overflow-hidden' : ''}`}>
+        <div className="flex w-full min-h-full">
+          {!isMessagesPage && <DesktopLeftSidebar />}
+          <div className="flex-1 min-w-0">
+            {renderActivePage()}
+          </div>
+        </div>
       </main>
 
       {/* WhatsApp-Style Bottom Navigation Bar (hidden on full-screen Messages) */}

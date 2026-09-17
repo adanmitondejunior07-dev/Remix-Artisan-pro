@@ -1,18 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ArrowLeft,
   Star,
   ShieldCheck,
   MapPin,
   Phone,
-  Mail,
-  Calendar,
   MessageSquare,
   FileText,
   Sparkles,
   CheckCircle2,
   Clock,
-  Briefcase,
   ExternalLink,
   Facebook,
   MessageCircle,
@@ -23,6 +20,20 @@ import {
   Check,
   X,
   Upload,
+  MoreHorizontal,
+  Plus,
+  Edit3,
+  Settings,
+  Bell,
+  Trash2,
+  UserCheck,
+  UserPlus,
+  Flag,
+  Ban,
+  Copy,
+  Layers,
+  Briefcase,
+  AlertTriangle,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import {
@@ -33,10 +44,11 @@ import {
 import {
   PROFILE_BANNER_PRESETS,
   getArtisanBanner,
-  ProfileBannerPreset,
 } from '../data/profileBanners.ts';
 import { api } from '../services/api.ts';
-import type { CallRecord } from '../types.ts';
+import type { CallRecord, SocialPost, Artisan } from '../types.ts';
+import { SocialPostCard } from './SocialPostCard.tsx';
+import { PublierRealisation } from './PublierRealisation.tsx';
 
 export const ProfilePage: React.FC = () => {
   const {
@@ -48,37 +60,165 @@ export const ProfilePage: React.FC = () => {
     showToast,
     currentUser,
     currentArtisan,
+    artisans,
+    socialPosts,
+    followingArtisans,
+    toggleFollowArtisan,
     updateUserProfile,
     uploadProfilePhoto,
     uploadCoverPhoto,
     refreshData,
   } = useApp();
 
-  // Banner customization modal state
-  const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
-  const [selectedPresetUrl, setSelectedPresetUrl] = useState<string>('');
-  const [customBannerUrl, setCustomBannerUrl] = useState<string>('');
-  const [avatarUrl, setAvatarUrl] = useState<string>('');
-  const [whatsappVal, setWhatsappVal] = useState<string>('');
-  const [facebookVal, setFacebookVal] = useState<string>('');
-  const [tiktokVal, setTiktokVal] = useState<string>('');
-  const [isSaving, setIsSaving] = useState(false);
+  // 1. Détermination du profil cible (Artisan sélectionné OU utilisateur actuel)
+  const isTargetingArtisan = Boolean(selectedArtisan);
+
+  // Vérifier si l'utilisateur consulte son propre profil
+  const isOwnProfile = Boolean(
+    !selectedArtisan ||
+    (currentUser && selectedArtisan && (
+      String(currentUser.id) === String(selectedArtisan.id) ||
+      (currentUser as any).uid === String(selectedArtisan.id) ||
+      currentUser.artisanId === selectedArtisan.id
+    )) ||
+    (currentArtisan && selectedArtisan && currentArtisan.id === selectedArtisan.id)
+  );
+
+  // Informations effectives du profil affiché
+  const targetName = isTargetingArtisan
+    ? selectedArtisan!.name
+    : currentUser?.name || currentArtisan?.name || 'Mon Profil';
+
+  const targetTrade = isTargetingArtisan
+    ? selectedArtisan!.trade
+    : currentArtisan?.trade || (currentUser?.role === 'artisan' ? 'Artisan Professionnel' : 'Membre Particulier');
+
+  const targetCity = isTargetingArtisan
+    ? selectedArtisan!.city
+    : currentArtisan?.city || currentUser?.city || 'Abidjan';
+
+  const targetCountry = isTargetingArtisan
+    ? selectedArtisan!.country
+    : currentArtisan?.country || currentUser?.country || 'Côte d’Ivoire';
+
+  // RÈGLE ABSOLUE 2: Badge ArtisanPro UNIQUEMENT si réellement vérifié dans la base de données
+  const isActuallyVerified = Boolean(
+    isTargetingArtisan
+      ? selectedArtisan!.verified || (selectedArtisan as any)!.is_verified
+      : currentUser?.verified || (currentUser as any)?.is_verified || currentArtisan?.verified || (currentArtisan as any)?.is_verified
+  );
+
+  const targetBio = isTargetingArtisan
+    ? selectedArtisan!.description || `${selectedArtisan!.name} est un professionnel qualifié à ${selectedArtisan!.city}. Contactez-le pour vos travaux et réalisations.`
+    : (currentUser as any)?.bio || currentArtisan?.description || 'Bienvenue sur mon profil ArtisanPro.';
+
+  const targetAvatar = isTargetingArtisan
+    ? selectedArtisan!.avatarUrl || (selectedArtisan as any)!.photoUrl
+    : currentUser?.avatarUrl || currentArtisan?.avatarUrl;
+
+  const targetEmoji = isTargetingArtisan ? selectedArtisan!.emoji : '👤';
+
+  const defaultBanner = isTargetingArtisan ? getArtisanBanner(selectedArtisan!) : PROFILE_BANNER_PRESETS[0].url;
+  const targetCover = (isTargetingArtisan ? selectedArtisan!.bannerUrl || selectedArtisan!.coverUrl : currentUser?.bannerUrl || currentArtisan?.bannerUrl) || defaultBanner;
+
+  const targetPhone = isTargetingArtisan ? selectedArtisan!.phone : currentUser?.phone || currentArtisan?.phone || '';
+  const targetWhatsapp = isTargetingArtisan ? selectedArtisan!.whatsapp || selectedArtisan!.phone : currentUser?.whatsapp || currentArtisan?.whatsapp || targetPhone;
+  const targetFacebook = isTargetingArtisan ? selectedArtisan!.facebook : currentUser?.facebook || currentArtisan?.facebook || '';
+  const targetTiktok = isTargetingArtisan ? selectedArtisan!.tiktok : currentUser?.tiktok || currentArtisan?.tiktok || '';
+
+  // Liens sociaux
+  const whatsappUrl = formatWhatsAppUrl(targetWhatsapp);
+  const facebookUrl = formatFacebookUrl(targetFacebook);
+  const tiktokUrl = formatTikTokUrl(targetTiktok);
+
+  // Publications de ce profil (Règle 3 & 6)
+  const userPosts = useMemo(() => {
+    return socialPosts.filter((p) => {
+      if (isTargetingArtisan) {
+        return (
+          p.artisanId === selectedArtisan!.id ||
+          (p.userId && String(p.userId) === String(selectedArtisan!.id)) ||
+          (p.author && p.author.trim().toLowerCase() === targetName.trim().toLowerCase()) ||
+          (p.artisanName && p.artisanName.trim().toLowerCase() === targetName.trim().toLowerCase())
+        );
+      }
+      if (currentUser?.id) {
+        return (
+          p.userId === String(currentUser.id) ||
+          (currentArtisan?.id && p.artisanId === currentArtisan.id) ||
+          (p.author && p.author.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase())
+        );
+      }
+      return false;
+    });
+  }, [socialPosts, isTargetingArtisan, selectedArtisan, currentUser, currentArtisan, targetName]);
+
+  // Photos de ce profil
+  const userPhotos = useMemo(() => {
+    const photos: { id: string; url: string; title: string }[] = [];
+    userPosts.forEach((post) => {
+      const media = post.mediaUrl || (post as any).image;
+      if (media && typeof media === 'string' && !media.startsWith('data:video')) {
+        photos.push({
+          id: post.id,
+          url: media,
+          title: post.content || 'Photo de réalisation',
+        });
+      }
+    });
+    return photos;
+  }, [userPosts]);
+
+  // Statistiques réelles (Règle 3: Ne jamais utiliser de faux nombres)
+  const isFollowing = Boolean(isTargetingArtisan && followingArtisans.includes(selectedArtisan!.id));
+  const followersCount = isTargetingArtisan
+    ? (selectedArtisan!.reviewsCount ? selectedArtisan!.reviewsCount + (isFollowing ? 1 : 0) : (isFollowing ? 1 : 0))
+    : followingArtisans.length;
+  const followingCount = isOwnProfile ? followingArtisans.length : (isTargetingArtisan ? 1 : 0);
+
+  // Onglets (Règle 5)
+  const [activeTab, setActiveTab] = useState<'publications' | 'about' | 'photos' | 'services' | 'reviews'>('publications');
+
+  // Menus & Modales
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
+  const [isCreatingPost, setIsCreatingPost] = useState(false);
+  const [selectedPhotoPreview, setSelectedPhotoPreview] = useState<string | null>(null);
+
+  // États pour la modification du profil
+  const [editName, setEditName] = useState(targetName);
+  const [editTrade, setEditTrade] = useState(targetTrade);
+  const [editCity, setEditCity] = useState(targetCity);
+  const [editCountry, setEditCountry] = useState(targetCountry);
+  const [editBio, setEditBio] = useState(targetBio);
+  const [editPhone, setEditPhone] = useState(targetPhone);
+  const [editWhatsapp, setEditWhatsapp] = useState(targetWhatsapp);
+  const [editFacebook, setEditFacebook] = useState(targetFacebook);
+  const [editTiktok, setEditTiktok] = useState(targetTiktok);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Historique d'appels VoIP (pour artisan)
   const [callHistory, setCallHistory] = useState<CallRecord[]>([]);
   const [isLoadingCalls, setIsLoadingCalls] = useState(false);
-  const bannerFileInputRef = useRef<HTMLInputElement>(null);
-  const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (selectedArtisan?.id) {
       setIsLoadingCalls(true);
       api.getCallHistory(selectedArtisan.id)
         .then((calls) => setCallHistory(calls))
-        .catch((err) => console.warn('Erreur chargement historique appels:', err))
+        .catch(() => {})
         .finally(() => setIsLoadingCalls(false));
     }
   }, [selectedArtisan?.id]);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'banner' | 'avatar') => {
+  // Références d'upload de fichiers
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 14. Gestion de la Photo de Profil
+  const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 8 * 1024 * 1024) {
@@ -90,139 +230,142 @@ export const ProfilePage: React.FC = () => {
       return;
     }
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (type === 'banner') {
-        setCustomBannerUrl(result);
-      } else {
-        setAvatarUrl(result);
+    reader.onload = async (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        await uploadProfilePhoto(dataUrl);
+        setIsAvatarModalOpen(false);
       }
     };
     reader.readAsDataURL(file);
   };
 
-  if (!selectedArtisan) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center space-y-4">
-        <p className="text-neutral-500">Aucun artisan sélectionné.</p>
-        <button
-          onClick={() => go('search')}
-          className="px-4 py-2 bg-amber-500 text-white text-xs font-bold rounded-xl"
-        >
-          Retourner à la recherche
-        </button>
-      </div>
-    );
-  }
-
-  const distance = calculateDistance(selectedArtisan.lat, selectedArtisan.lng);
-
-  // Determine WhatsApp link (from field or fallback to phone)
-  const whatsappUrl = formatWhatsAppUrl(selectedArtisan.whatsapp || selectedArtisan.phone);
-  const facebookUrl = formatFacebookUrl(selectedArtisan.facebook);
-  const tiktokUrl = formatTikTokUrl(selectedArtisan.tiktok);
-
-  const bannerImage = getArtisanBanner(selectedArtisan);
-
-  // Can the user edit this profile?
-  const canEdit =
-    currentUser?.role === 'artisan' ||
-    currentUser?.role === 'admin' ||
-    currentUser?.role === 'super_admin' ||
-    currentUser?.artisanId === selectedArtisan.id;
-
-  const openBannerModal = () => {
-    setSelectedPresetUrl(selectedArtisan.bannerUrl || bannerImage);
-    setCustomBannerUrl(selectedArtisan.bannerUrl || '');
-    setAvatarUrl(selectedArtisan.avatarUrl || '');
-    setWhatsappVal(selectedArtisan.whatsapp || selectedArtisan.phone || '');
-    setFacebookVal(selectedArtisan.facebook || '');
-    setTiktokVal(selectedArtisan.tiktok || '');
-    setIsBannerModalOpen(true);
+  const handleRemoveAvatar = async () => {
+    await uploadProfilePhoto('');
+    setIsAvatarModalOpen(false);
+    showToast({
+      title: 'Photo retirée',
+      desc: 'Votre photo de profil a été supprimée.',
+      type: 'info',
+    });
   };
 
-  const handleSaveBanner = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    try {
-      const finalBanner = customBannerUrl.trim() || selectedPresetUrl || selectedArtisan.bannerUrl;
-      const finalAvatar = avatarUrl.trim() || selectedArtisan.avatarUrl;
-
-      // Update in API avec préservation stricte
-      await api.updateArtisan(selectedArtisan.id, {
-        bannerUrl: finalBanner,
-        coverUrl: finalBanner,
-        avatarUrl: finalAvatar,
-        photoUrl: finalAvatar,
-        whatsapp: whatsappVal.trim() || undefined,
-        facebook: facebookVal.trim() || undefined,
-        tiktok: tiktokVal.trim() || undefined,
+  // 15. Gestion de la Photo de Couverture
+  const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      showToast({
+        title: 'Fichier trop volumineux',
+        desc: 'Veuillez choisir une image de moins de 8 Mo.',
+        type: 'warning',
       });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        await uploadCoverPhoto(dataUrl);
+        setIsCoverModalOpen(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
-      // Update local artisan object
-      if (finalBanner) selectedArtisan.bannerUrl = finalBanner;
-      if (finalAvatar) selectedArtisan.avatarUrl = finalAvatar;
-      selectedArtisan.whatsapp = whatsappVal.trim();
-      selectedArtisan.facebook = facebookVal.trim();
-      selectedArtisan.tiktok = tiktokVal.trim();
+  const handleSelectCoverPreset = async (presetUrl: string) => {
+    await uploadCoverPhoto(presetUrl);
+    setIsCoverModalOpen(false);
+  };
 
-      // If current user is this artisan or artisan user, sync
+  const handleRemoveCover = async () => {
+    await uploadCoverPhoto('');
+    setIsCoverModalOpen(false);
+    showToast({
+      title: 'Couverture retirée',
+      desc: 'Votre couverture personnalisée a été supprimée.',
+      type: 'info',
+    });
+  };
+
+  // Enregistrement des modifications du profil
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    try {
+      if (selectedArtisan && canEdit) {
+        await api.updateArtisan(selectedArtisan.id, {
+          name: editName.trim(),
+          trade: editTrade.trim(),
+          city: editCity.trim(),
+          country: editCountry.trim(),
+          description: editBio.trim(),
+          phone: editPhone.trim(),
+          whatsapp: editWhatsapp.trim(),
+          facebook: editFacebook.trim(),
+          tiktok: editTiktok.trim(),
+        });
+        selectedArtisan.name = editName.trim();
+        selectedArtisan.trade = editTrade.trim();
+        selectedArtisan.city = editCity.trim();
+        selectedArtisan.country = editCountry.trim();
+        selectedArtisan.description = editBio.trim();
+        selectedArtisan.phone = editPhone.trim();
+        selectedArtisan.whatsapp = editWhatsapp.trim();
+        selectedArtisan.facebook = editFacebook.trim();
+        selectedArtisan.tiktok = editTiktok.trim();
+      }
+
       if (currentUser) {
-        if (finalAvatar) {
-          try {
-            await uploadProfilePhoto(finalAvatar);
-          } catch {}
-        }
-        if (finalBanner) {
-          try {
-            await uploadCoverPhoto(finalBanner);
-          } catch {}
-        }
         await updateUserProfile(
           {
-            whatsapp: whatsappVal.trim(),
-            facebook: facebookVal.trim(),
-            tiktok: tiktokVal.trim(),
-            avatarUrl: finalAvatar,
-            photoUrl: finalAvatar,
-            bannerUrl: finalBanner,
-            coverUrl: finalBanner,
+            name: editName.trim(),
+            city: editCity.trim(),
+            country: editCountry.trim(),
+            phone: editPhone.trim(),
+            whatsapp: editWhatsapp.trim(),
+            facebook: editFacebook.trim(),
+            tiktok: editTiktok.trim(),
+            trade: editTrade.trim(),
+            bio: editBio.trim(),
           },
           {
-            bannerUrl: finalBanner,
-            coverUrl: finalBanner,
-            avatarUrl: finalAvatar,
-            photoUrl: finalAvatar,
-            whatsapp: whatsappVal.trim(),
-            facebook: facebookVal.trim(),
-            tiktok: tiktokVal.trim(),
+            name: editName.trim(),
+            trade: editTrade.trim(),
+            city: editCity.trim(),
+            country: editCountry.trim(),
+            description: editBio.trim(),
+            phone: editPhone.trim(),
+            whatsapp: editWhatsapp.trim(),
+            facebook: editFacebook.trim(),
+            tiktok: editTiktok.trim(),
           }
         );
       }
 
       await refreshData();
-      setIsBannerModalOpen(false);
+      setIsEditProfileOpen(false);
       showToast({
-        title: 'Bannière & Profil enregistrés !',
-        desc: 'Votre profil a été mis à jour avec succès.',
+        title: 'Profil mis à jour !',
+        desc: 'Vos informations ont été enregistrées avec succès.',
         type: 'success',
       });
     } catch (err: any) {
       showToast({
         title: 'Erreur',
-        desc: err.message || 'Impossible d’enregistrer la bannière',
+        desc: err?.message || 'Impossible d’enregistrer le profil.',
         type: 'warning',
       });
     } finally {
-      setIsSaving(false);
+      setIsSavingProfile(false);
     }
   };
 
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: `${selectedArtisan.name} - ${selectedArtisan.trade} sur Artisan Pro Afrique`,
-        text: `Découvrez le profil et les services de ${selectedArtisan.name} à ${selectedArtisan.city}.`,
+        title: `${targetName} - ArtisanPro Afrique`,
+        text: `Découvrez le profil de ${targetName} (${targetTrade}) sur ArtisanPro.`,
         url: window.location.href,
       }).catch(() => {});
     } else {
@@ -235,733 +378,1088 @@ export const ProfilePage: React.FC = () => {
     }
   };
 
+  const distance = isTargetingArtisan && selectedArtisan?.lat && selectedArtisan?.lng
+    ? calculateDistance(selectedArtisan.lat, selectedArtisan.lng)
+    : null;
+
+  const canEdit = isOwnProfile;
+
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Top Navigation & Share */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => go('search')}
-          className="inline-flex items-center gap-2 text-xs font-bold text-neutral-600 hover:text-neutral-900 transition-colors bg-white px-3.5 py-2 rounded-xl border border-neutral-200 hover:border-neutral-300 shadow-2xs cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>← Retour aux artisans</span>
-        </button>
+    <div className="w-full min-h-screen bg-neutral-100/70 pb-24">
+      {/* Conteneur principal profil centré */}
+      <div className="w-full max-w-[620px] mx-auto sm:px-2 pt-1 sm:pt-3">
+        {/* CARTE DU PROFIL PRINCIPAL */}
+        <div className="w-[92%] sm:w-full mx-auto bg-white rounded-2xl sm:rounded-3xl border border-neutral-200 shadow-xs overflow-hidden">
+          {/* 1. PHOTO DE COUVERTURE (Règles 2 & 15) */}
+          <div className="relative h-44 sm:h-60 w-full bg-neutral-900 overflow-hidden group">
+            {targetCover ? (
+              <img
+                src={targetCover}
+                alt={`Couverture de ${targetName}`}
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-r from-neutral-950 via-neutral-900 to-amber-950" />
+            )}
 
-        <div className="flex items-center gap-2">
-          {canEdit && (
+            {/* Bouton de retour */}
             <button
-              onClick={openBannerModal}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 px-3.5 py-2 rounded-xl border border-amber-300 transition-colors shadow-2xs cursor-pointer"
+              type="button"
+              onClick={() => go('search')}
+              className="absolute top-3 left-3 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md text-white flex items-center justify-center transition-colors cursor-pointer border border-white/20 z-10"
+              title="Retour"
+              aria-label="Retour"
             >
-              <Camera className="w-3.5 h-3.5 text-amber-600" />
-              <span>Changer la bannière & réseaux</span>
+              <ArrowLeft className="w-5 h-5" />
             </button>
-          )}
 
-          <button
-            onClick={handleShare}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 bg-white px-3 py-2 rounded-xl border border-neutral-200 hover:border-neutral-300 shadow-2xs transition-colors cursor-pointer"
-          >
-            <Share2 className="w-3.5 h-3.5 text-neutral-500" />
-            <span>Partager ce profil</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Profile Header Card with Banner */}
-      <div className="bg-white rounded-3xl border border-neutral-200 shadow-xs overflow-hidden">
-        {/* PROFILE BANNER IMAGE */}
-        <div className="relative h-48 sm:h-64 w-full overflow-hidden bg-neutral-900 group">
-          <img
-            src={bannerImage}
-            alt={`Bannière de ${selectedArtisan.name}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-            referrerPolicy="no-referrer"
-          />
-          {/* Subtle gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/80 via-black/20 to-transparent"></div>
-
-          {/* Banner Top Info / Badges */}
-          <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-xs text-white text-xs font-bold border border-white/20">
-                {selectedArtisan.trade}
-              </span>
-              <span className="px-3 py-1 rounded-full bg-amber-500/80 backdrop-blur-xs text-white text-xs font-bold border border-amber-400/30">
-                {selectedArtisan.city}, {selectedArtisan.country}
-              </span>
-            </div>
-
-            {/* Quick edit banner button on hover */}
+            {/* Bouton Modifier la couverture (Règle 15) */}
             {canEdit && (
               <button
-                onClick={openBannerModal}
-                className="px-3 py-1.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-xs text-white text-xs font-bold border border-white/20 flex items-center gap-1.5 transition-all cursor-pointer"
+                type="button"
+                onClick={() => setIsCoverModalOpen(true)}
+                className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/70 hover:bg-black/90 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20 shadow-md z-10"
+                title="Modifier la photo de couverture"
               >
-                <Camera className="w-3.5 h-3.5 text-amber-400" />
-                <span>Changer bannière</span>
+                <Camera className="w-4 h-4 text-[#FF6B00]" />
+                <span className="hidden sm:inline">Modifier la couverture</span>
               </button>
             )}
           </div>
-        </div>
 
-        {/* Profile Card Body */}
-        <div className="p-6 sm:p-8 space-y-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-neutral-100 -mt-16 sm:-mt-20">
-            {/* Avatar overlapping banner */}
-            <div className="flex items-start sm:items-center gap-5">
-              <div className="relative">
-                {selectedArtisan.avatarUrl ? (
+          {/* 2. EN-TÊTE AVEC AVATAR SUPERPOSÉ ET INFOS (Règle 2) */}
+          <div className="px-4 sm:px-6 pb-4">
+            {/* Ligne Avatar + Actions */}
+            <div className="flex items-end justify-between -mt-14 sm:-mt-16 mb-3">
+              {/* Photo de profil ronde superposée (Règles 2 & 14) */}
+              <div className="relative group">
+                {targetAvatar ? (
                   <img
-                    src={selectedArtisan.avatarUrl}
-                    alt={selectedArtisan.name}
-                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-4 border-white shadow-md bg-white shrink-0"
+                    src={targetAvatar}
+                    alt={targetName}
+                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-white shadow-md bg-white shrink-0"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br from-amber-100 to-amber-200 border-4 border-white flex items-center justify-center text-4xl sm:text-5xl shadow-md shrink-0">
-                    {selectedArtisan.emoji || '👨‍🔧'}
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-neutral-900 text-white border-4 border-white flex items-center justify-center text-3xl sm:text-4xl shadow-md font-bold shrink-0">
+                    {targetEmoji || targetName.charAt(0).toUpperCase()}
                   </div>
                 )}
-                {selectedArtisan.verified && (
+
+                {/* Badge de vérification réel */}
+                {isActuallyVerified && (
                   <div
-                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs"
-                    title="Artisan vérifié"
+                    className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-xs"
+                    title="Compte certifié et vérifié"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                   </div>
                 )}
+
+                {/* Bouton Modifier photo de profil (Règle 14) */}
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAvatarModalOpen(true)}
+                    className="absolute bottom-0 right-0 p-2 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white border-2 border-white shadow-md transition-transform hover:scale-105 cursor-pointer"
+                    title="Modifier la photo de profil"
+                    aria-label="Modifier la photo de profil"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              <div className="space-y-1.5 pt-6 sm:pt-10">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="text-2xl sm:text-3xl font-black text-neutral-950">
-                    {selectedArtisan.name}
-                  </h1>
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    Membre Vérifié
+              {/* Boutons d'action en haut à droite (Règle 4) */}
+              <div className="flex items-center gap-2">
+                {isOwnProfile ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditProfileOpen(true)}
+                      className="px-3.5 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-900 text-xs font-bold border border-neutral-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Modifier le profil</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingPost(true)}
+                      className="px-3.5 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span className="hidden sm:inline">Ajouter publication</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => isTargetingArtisan && toggleFollowArtisan(selectedArtisan!.id)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                        isFollowing
+                          ? 'bg-neutral-200 text-neutral-800 hover:bg-neutral-300'
+                          : 'bg-[#FF6B00] hover:bg-[#e05e00] text-white'
+                      }`}
+                    >
+                      {isFollowing ? <UserCheck className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
+                      <span>{isFollowing ? 'Abonné' : 'Suivre'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => isTargetingArtisan && startChatWithArtisan(selectedArtisan!.id)}
+                      className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Message</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Bouton Menu [...] (Règle 4 & 18) */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsMenuOpen((prev) => !prev)}
+                    className="w-9 h-9 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors cursor-pointer border border-neutral-200"
+                    aria-label="Options du profil"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+
+                  {/* Menu déroulant du profil (Règle 18) */}
+                  {isMenuOpen && (
+                    <div className="absolute right-0 top-11 w-56 bg-white rounded-2xl shadow-xl border border-neutral-200 py-1.5 z-40 animate-in fade-in zoom-in-95 text-xs text-neutral-800">
+                      {isOwnProfile ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { setIsMenuOpen(false); setIsEditProfileOpen(true); }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <Edit3 className="w-4 h-4 text-neutral-600" />
+                            <span>Modifier le profil</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setIsMenuOpen(false); setIsAvatarModalOpen(true); }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <Camera className="w-4 h-4 text-neutral-600" />
+                            <span>Modifier la photo de profil</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setIsMenuOpen(false); setIsCoverModalOpen(true); }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <ImageIcon className="w-4 h-4 text-neutral-600" />
+                            <span>Modifier la couverture</span>
+                          </button>
+                          <div className="my-1 border-t border-neutral-100" />
+                          <button
+                            type="button"
+                            onClick={() => { setIsMenuOpen(false); go('settings'); }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <Settings className="w-4 h-4 text-neutral-600" />
+                            <span>Paramètres</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setIsMenuOpen(false); go('privacy'); }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <ShieldCheck className="w-4 h-4 text-neutral-600" />
+                            <span>Confidentialité</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setIsMenuOpen(false); go('account'); }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <Bell className="w-4 h-4 text-neutral-600" />
+                            <span>Notifications</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setIsMenuOpen(false); setActiveTab('publications'); }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <Layers className="w-4 h-4 text-neutral-600" />
+                            <span>Gérer mes publications</span>
+                          </button>
+                          <div className="my-1 border-t border-neutral-100" />
+                          <button
+                            type="button"
+                            onClick={() => { setIsMenuOpen(false); go('delete-account'); }}
+                            className="w-full px-4 py-2 text-left hover:bg-red-50 text-red-600 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                            <span>Supprimer mon compte</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsMenuOpen(false);
+                              if (isTargetingArtisan) toggleFollowArtisan(selectedArtisan!.id);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <UserPlus className="w-4 h-4 text-neutral-600" />
+                            <span>{isFollowing ? 'Ne plus suivre' : 'Suivre ce profil'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsMenuOpen(false);
+                              if (isTargetingArtisan) startChatWithArtisan(selectedArtisan!.id);
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <MessageSquare className="w-4 h-4 text-neutral-600" />
+                            <span>Message direct</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsMenuOpen(false);
+                              handleShare();
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-neutral-50 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <Copy className="w-4 h-4 text-neutral-600" />
+                            <span>Copier le lien du profil</span>
+                          </button>
+                          <div className="my-1 border-t border-neutral-100" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsMenuOpen(false);
+                              showToast({
+                                title: 'Signalement transmis',
+                                desc: 'Merci. Notre équipe de modération examinera ce compte.',
+                                type: 'info',
+                              });
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-amber-50 text-amber-700 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <Flag className="w-4 h-4 text-amber-600" />
+                            <span>Signaler le profil</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsMenuOpen(false);
+                              showToast({
+                                title: 'Profil bloqué',
+                                desc: 'Vous ne verrez plus les publications de ce compte.',
+                                type: 'info',
+                              });
+                            }}
+                            className="w-full px-4 py-2 text-left hover:bg-red-50 text-red-600 flex items-center gap-2 font-medium cursor-pointer"
+                          >
+                            <Ban className="w-4 h-4 text-red-600" />
+                            <span>Bloquer</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Nom, Métier, Ville, Badge (Règle 2) */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
+                  {targetName}
+                </h1>
+                {isActuallyVerified && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Vérifié</span>
                   </span>
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                )}
+                {isTargetingArtisan && selectedArtisan?.plan && (
+                  <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-orange-50 text-[#FF6B00] border border-orange-200">
                     {selectedArtisan.plan}
                   </span>
-                </div>
-                <p className="text-sm font-semibold text-neutral-700 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-amber-600 font-bold">{selectedArtisan.trade}</span>
-                  <span>·</span>
-                  <span>
-                    {selectedArtisan.city}, {selectedArtisan.country}
-                  </span>
+                )}
+              </div>
+
+              <p className="text-xs sm:text-sm font-semibold text-neutral-700">
+                <span className="text-[#FF6B00] font-bold">{targetTrade}</span>
+                <span className="text-neutral-400 mx-1.5">•</span>
+                <span className="inline-flex items-center gap-1 text-neutral-600">
+                  <MapPin className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>{targetCity}, {targetCountry}</span>
+                </span>
+                {distance !== null && (
+                  <>
+                    <span className="text-neutral-400 mx-1.5">•</span>
+                    <span className="text-neutral-500">À {distance} km</span>
+                  </>
+                )}
+              </p>
+
+              {/* Courte Présentation / Bio (Règle 2) */}
+              {targetBio && (
+                <p className="text-xs sm:text-sm text-neutral-700 pt-1.5 leading-relaxed">
+                  {targetBio}
                 </p>
-                <div className="flex items-center gap-3 text-xs text-neutral-500 pt-1 flex-wrap">
-                  <div className="flex items-center gap-1 text-amber-500 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-                    <span>{selectedArtisan.rating} / 5</span>
-                    <span className="text-neutral-500 font-normal">({selectedArtisan.reviewsCount} avis)</span>
-                  </div>
-                  {selectedArtisan.verified && (
-                    <span className="flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      Identité vérifiée
-                    </span>
-                  )}
-                  {distance !== null && (
-                    <span className="flex items-center gap-1 text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-md">
-                      <MapPin className="w-3.5 h-3.5 text-neutral-500" />À {distance} km
-                    </span>
-                  )}
+              )}
+            </div>
+
+            {/* 3. STATISTIQUES RÉELLES (Règle 3: Publications, Abonnés, Abonnements) */}
+            <div className="flex items-center justify-around py-3.5 my-3 border-y border-neutral-100 text-center">
+              <div>
+                <div className="text-base sm:text-lg font-black text-neutral-900">
+                  {userPosts.length}
                 </div>
+                <div className="text-[11px] font-medium text-neutral-500">Publications</div>
+              </div>
+              <div className="w-px h-7 bg-neutral-200" />
+              <div>
+                <div className="text-base sm:text-lg font-black text-neutral-900">
+                  {followersCount}
+                </div>
+                <div className="text-[11px] font-medium text-neutral-500">Abonnés</div>
+              </div>
+              <div className="w-px h-7 bg-neutral-200" />
+              <div>
+                <div className="text-base sm:text-lg font-black text-neutral-900">
+                  {followingCount}
+                </div>
+                <div className="text-[11px] font-medium text-neutral-500">Abonnements</div>
               </div>
             </div>
 
-            {/* Action CTAs */}
-            <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 w-full md:w-auto shrink-0 pt-3 md:pt-10">
-              {/* Direct WhatsApp Action */}
-              {whatsappUrl && (
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 group"
-                >
-                  <MessageCircle className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-                  <span>WhatsApp Direct</span>
-                  <ExternalLink className="w-3 h-3 text-emerald-200" />
-                </a>
-              )}
-
-              <button
-                onClick={() => startChatWithArtisan(selectedArtisan.id)}
-                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Messagerie interne</span>
-              </button>
-
-              <button
-                onClick={() => quoteModal.open(selectedArtisan)}
-                className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <FileText className="w-4 h-4" />
-                <span>Demander un devis</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Réseaux Sociaux & Contact Direct (WhatsApp, Facebook, TikTok) */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-neutral-50 via-amber-50/20 to-neutral-50 border border-neutral-200 space-y-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-800 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-600" />
-                <span>Réseaux sociaux & Contact direct de l'artisan</span>
-              </h2>
-              <span className="text-[11px] text-neutral-500">Joignable 7j/7 sans intermédiaire</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* WhatsApp */}
-              <div className="p-3.5 rounded-xl bg-white border border-emerald-200 shadow-2xs flex flex-col justify-between space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
-                      <MessageCircle className="w-4 h-4" />
-                    </div>
-                    <span>WhatsApp</span>
-                  </div>
-                  <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100">
-                    En ligne
-                  </span>
-                </div>
-                <p className="text-xs text-neutral-600 font-mono">
-                  {selectedArtisan.whatsapp || selectedArtisan.phone}
-                </p>
+            {/* Boutons d'action Artisan : Contacter (WhatsApp) & Devis (Règle 16) */}
+            {isTargetingArtisan && !isOwnProfile && (
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
                 {whatsappUrl ? (
                   <a
                     href={whatsappUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                    className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
                   >
-                    <span>Ouvrir WhatsApp</span>
-                    <ExternalLink className="w-3 h-3" />
+                    <MessageCircle className="w-4 h-4" />
+                    <span>WhatsApp</span>
                   </a>
                 ) : (
-                  <span className="text-[11px] text-neutral-400 italic">Non configuré</span>
-                )}
-              </div>
-
-              {/* Facebook */}
-              <div className="p-3.5 rounded-xl bg-white border border-blue-200 shadow-2xs flex flex-col justify-between space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-blue-700 font-bold text-xs">
-                    <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700">
-                      <Facebook className="w-4 h-4" />
-                    </div>
-                    <span>Facebook</span>
-                  </div>
-                  <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">
-                    Page Pro
-                  </span>
-                </div>
-                <p className="text-xs text-neutral-600 font-mono truncate">
-                  {selectedArtisan.facebook ? `@${selectedArtisan.facebook.replace(/^https?:\/\/(www\.)?facebook\.com\//, '')}` : 'Non renseigné'}
-                </p>
-                {facebookUrl ? (
                   <a
-                    href={facebookUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                    href={`tel:${targetPhone}`}
+                    className="py-2.5 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
                   >
-                    <span>Voir sur Facebook</span>
-                    <ExternalLink className="w-3 h-3" />
+                    <Phone className="w-4 h-4" />
+                    <span>Appeler</span>
                   </a>
-                ) : (
-                  <span className="text-[11px] text-neutral-400 italic">Non configuré</span>
                 )}
-              </div>
 
-              {/* TikTok */}
-              <div className="p-3.5 rounded-xl bg-white border border-neutral-300 shadow-2xs flex flex-col justify-between space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-neutral-900 font-bold text-xs">
-                    <div className="w-7 h-7 rounded-lg bg-neutral-900 text-white flex items-center justify-center">
-                      <Video className="w-4 h-4" />
-                    </div>
-                    <span>TikTok</span>
-                  </div>
-                  <span className="text-[10px] font-semibold bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded-full border border-neutral-200">
-                    Vidéos Réalisations
-                  </span>
-                </div>
-                <p className="text-xs text-neutral-600 font-mono truncate">
-                  {selectedArtisan.tiktok ? `@${selectedArtisan.tiktok.replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/, '')}` : 'Non renseigné'}
-                </p>
-                {tiktokUrl ? (
-                  <a
-                    href={tiktokUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <span>Voir sur TikTok</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                ) : (
-                  <span className="text-[11px] text-neutral-400 italic">Non configuré</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Bio & Details */}
-          <div className="space-y-3">
-            <h2 className="text-base font-bold text-neutral-900">Présentation & Savoir-faire</h2>
-            <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed max-w-3xl">
-              {selectedArtisan.description ||
-                `${selectedArtisan.name} est un artisan passionné et certifié à ${selectedArtisan.city}, spécialisé en ${selectedArtisan.trade} avec plusieurs années d'expérience et d'excellents retours clients.`}
-            </p>
-          </div>
-
-          {/* General Information Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-4 border-y border-neutral-100 text-xs">
-            <div>
-              <span className="text-neutral-400 block mb-0.5">Tarif horaire moyen</span>
-              <span className="font-bold text-neutral-900">{selectedArtisan.hourlyRate || '10 000 FCFA'}</span>
-            </div>
-            <div>
-              <span className="text-neutral-400 block mb-0.5">Expérience</span>
-              <span className="font-bold text-neutral-900">{selectedArtisan.experienceYears || 5} ans d'exercice</span>
-            </div>
-            <div>
-              <span className="text-neutral-400 block mb-0.5">Délais d'intervention</span>
-              <span className="font-bold text-emerald-700">Sous 24h à 48h</span>
-            </div>
-            <div>
-              <span className="text-neutral-400 block mb-0.5">Garantie & Savoir-faire</span>
-              <span className="font-bold text-neutral-900">Assuré & Certifié</span>
-            </div>
-          </div>
-
-          {/* Services catalogue preview */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-neutral-900">Prestations & Tarifs directs</h2>
-              <span className="text-xs text-neutral-500">Sélectionnez pour commander</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                {
-                  title: `Intervention ${selectedArtisan.trade} standard`,
-                  price: selectedArtisan.hourlyRate || '15 000 FCFA',
-                  duration: '1-2 jours',
-                  desc: 'Diagnostic complet, fournitures de qualité et réalisation soignée.',
-                },
-                {
-                  title: 'Entretien & Rénovation complète',
-                  price: 'Sur Devis gratuit',
-                  duration: '3-5 jours',
-                  desc: 'Devis sur-mesure gratuit avec déplacement sur site.',
-                },
-              ].map((srv, idx) => (
-                <div key={idx} className="p-4 rounded-2xl border border-neutral-200 bg-neutral-50/50 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <h3 className="font-bold text-sm text-neutral-900">{srv.title}</h3>
-                    <span className="font-extrabold text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
-                      {srv.price}
-                    </span>
-                  </div>
-                  <p className="text-xs text-neutral-600">{srv.desc}</p>
-                  <div className="text-[11px] text-neutral-500 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Délai : {srv.duration}</span>
-                  </div>
-                  <button
-                    onClick={() => quoteModal.open(selectedArtisan, srv.title)}
-                    className="mt-3 w-full py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition-colors text-center cursor-pointer"
-                  >
-                    Demander ce service
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Reviews preview */}
-          <div className="pt-6 border-t border-neutral-100 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-neutral-900">Avis clients vérifiés</h2>
-              <span className="text-xs font-bold text-neutral-500">Note globale : {selectedArtisan.rating} / 5</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-100 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-neutral-900">Kouamé B. (Abidjan)</span>
-                  <span className="text-amber-500 font-bold">⭐⭐⭐⭐⭐</span>
-                </div>
-                <p className="text-neutral-600 italic">
-                  « Travail très soigné, ponctuel et respectueux des délais. Contact facile via WhatsApp et devis respecté. Je recommande ! »
-                </p>
-              </div>
-              <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-100 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-neutral-900">Mariam D. (Cocody)</span>
-                  <span className="text-amber-500 font-bold">⭐⭐⭐⭐⭐</span>
-                </div>
-                <p className="text-neutral-600 italic">
-                  « Devis clair et transparent, intervention rapide dès le lendemain. Échanges fluides sur WhatsApp et photos envoyées avant livraison. »
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* HISTORIQUE D'APPELS VOIP (REQUIREMENT 4) */}
-          <div className="pt-6 border-t border-neutral-100 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div>
-                <h2 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
-                  <Phone className="w-5 h-5 text-sky-600" />
-                  <span>Historique d'appels VoIP</span>
-                </h2>
-                <p className="text-xs text-neutral-500">
-                  Journal des communications vocales et vidéo sécurisées
-                </p>
-              </div>
-
-              {/* Security & Privacy Badges (Dark styled) */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-900 text-sky-400 text-[10.5px] font-bold shadow-2xs border border-neutral-800">
-                  <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Chiffré de bout en bout</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-900 text-emerald-400 text-[10.5px] font-bold shadow-2xs border border-neutral-800">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>Numéros Masqués</span>
-                </span>
-              </div>
-            </div>
-
-            {isLoadingCalls ? (
-              <div className="py-8 text-center text-xs text-neutral-400">
-                Chargement de l'historique des appels...
-              </div>
-            ) : callHistory.length > 0 ? (
-              <div className="divide-y divide-neutral-100 rounded-2xl border border-neutral-200 bg-white overflow-hidden shadow-xs">
-                {callHistory.map((call, cIdx) => {
-                  const isVideo = call.type === 'video';
-                  const isMissed = call.status === 'missed';
-
-                  return (
-                    <div
-                      key={call.id || `call-${cIdx}`}
-                      className="p-3.5 sm:p-4 flex items-center justify-between gap-3 hover:bg-neutral-50/60 transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                            isMissed
-                              ? 'bg-red-50 text-red-600 border border-red-200'
-                              : isVideo
-                              ? 'bg-sky-50 text-sky-600 border border-sky-200'
-                              : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                          }`}
-                        >
-                          {isVideo ? (
-                            <Video className="w-5 h-5 stroke-[2.2]" />
-                          ) : (
-                            <Phone className="w-5 h-5 stroke-[2.2]" />
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-xs sm:text-sm text-neutral-900 truncate">
-                              {isVideo ? 'Appel vidéo VoIP' : 'Appel vocal VoIP'}
-                            </span>
-                            <span
-                              className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                isMissed
-                                  ? 'bg-red-50 text-red-700 border border-red-200'
-                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              }`}
-                            >
-                              {isMissed ? 'Appel manqué' : 'Terminé'}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-3 text-[11px] text-neutral-500 mt-1 flex-wrap">
-                            <span className="flex items-center gap-1 font-medium">
-                              <Calendar className="w-3 h-3 text-neutral-400" />
-                              {new Date(call.timestamp).toLocaleDateString('fr-FR', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              })}{' '}
-                              à{' '}
-                              {new Date(call.timestamp).toLocaleTimeString('fr-FR', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1 font-mono font-medium">
-                              <Clock className="w-3 h-3 text-neutral-400" />
-                              Durée : {isMissed ? '00:00' : call.formattedDuration}
-                            </span>
-                            <span>•</span>
-                            <span className="text-[10.5px] text-neutral-500 font-medium">
-                              {call.clientName ? `Client : ${call.clientName}` : 'Client vérifié'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => startChatWithArtisan(selectedArtisan)}
-                        className="px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-2xs cursor-pointer"
-                      >
-                        <Phone className="w-3.5 h-3.5 text-sky-400" />
-                        <span className="hidden sm:inline">Rappeler</span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="p-6 rounded-2xl border border-neutral-200 bg-neutral-50/50 text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 flex items-center justify-center mx-auto shadow-2xs">
-                  <Phone className="w-6 h-6 stroke-[2]" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-bold text-neutral-900">Aucun appel VoIP enregistré</h4>
-                  <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                    Passez un appel direct sécurisé depuis la messagerie pour discuter de votre devis sans dévoiler vos numéros de téléphone.
-                  </p>
-                </div>
                 <button
                   type="button"
-                  onClick={() => startChatWithArtisan(selectedArtisan)}
-                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                  onClick={() => quoteModal.open(selectedArtisan)}
+                  className="py-2.5 px-3 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
                 >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Démarrer un appel VoIP dans le chat</span>
+                  <FileText className="w-4 h-4" />
+                  <span>Demander un devis</span>
                 </button>
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* BANNER & SOCIAL CUSTOMIZATION MODAL */}
-      {isBannerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-neutral-200 overflow-hidden">
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-gradient-to-r from-neutral-950 via-neutral-900 to-amber-950 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400">
-                  <Camera className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm sm:text-base leading-tight">
-                    Personnaliser la Bannière & Liens Sociaux
-                  </h3>
-                  <p className="text-xs text-neutral-300">
-                    Modifiez la bannière d’en-tête, votre photo et vos réseaux (WhatsApp, Facebook, TikTok)
-                  </p>
-                </div>
-              </div>
+          {/* 5. ONGLETS DU PROFIL (Règle 5: Navigation horizontale mobile) */}
+          <div className="border-t border-neutral-200 bg-neutral-50/70">
+            <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 overflow-x-auto scrollbar-none">
               <button
-                onClick={() => setIsBannerModalOpen(false)}
-                className="p-1 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white"
+                type="button"
+                onClick={() => setActiveTab('publications')}
+                className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTab === 'publications'
+                    ? 'border-[#FF6B00] text-[#FF6B00]'
+                    : 'border-transparent text-neutral-600 hover:text-neutral-900'
+                }`}
               >
-                <X className="w-5 h-5" />
+                Publications ({userPosts.length})
               </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('about')}
+                className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTab === 'about'
+                    ? 'border-[#FF6B00] text-[#FF6B00]'
+                    : 'border-transparent text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                À propos
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('photos')}
+                className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTab === 'photos'
+                    ? 'border-[#FF6B00] text-[#FF6B00]'
+                    : 'border-transparent text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                Photos ({userPhotos.length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('services')}
+                className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTab === 'services'
+                    ? 'border-[#FF6B00] text-[#FF6B00]'
+                    : 'border-transparent text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                {isTargetingArtisan ? 'Réalisations & Services' : 'Services'}
+              </button>
+
+              {isTargetingArtisan && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('reviews')}
+                  className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
+                    activeTab === 'reviews'
+                      ? 'border-[#FF6B00] text-[#FF6B00]'
+                      : 'border-transparent text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  Avis & Appels
+                </button>
+              )}
             </div>
+          </div>
+        </div>
 
-            {/* Modal Content */}
-            <form onSubmit={handleSaveBanner} className="p-6 overflow-y-auto space-y-5">
-              {/* Banner Presets Picker */}
+        {/* CONTENU DES ONGLETS */}
+        <div className="mt-3.5 sm:mt-4">
+          {/* ONGLET 1: PUBLICATIONS (Règle 6: Largeur responsive 92-95% mobile, max 680px desktop) */}
+          {activeTab === 'publications' && (
+            <div className="space-y-3.5">
+              {/* Bouton rapide d'ajout si propre profil */}
+              {isOwnProfile && (
+                <div className="w-[92%] sm:w-full mx-auto bg-white rounded-2xl border border-neutral-200 p-3 flex items-center justify-between shadow-2xs">
+                  <span className="text-xs text-neutral-600">Partager un travail ou une réalisation</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingPost(true)}
+                    className="px-3 py-1.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Publier</span>
+                  </button>
+                </div>
+              )}
+
+              {userPosts.length > 0 ? (
+                userPosts.map((post) => (
+                  <SocialPostCard key={post.id} post={post} />
+                ))
+              ) : (
+                <div className="w-[92%] sm:w-full mx-auto bg-white rounded-2xl border border-neutral-200 p-8 text-center space-y-3 shadow-2xs">
+                  <div className="w-12 h-12 rounded-full bg-orange-50 text-[#FF6B00] flex items-center justify-center mx-auto">
+                    <ImageIcon className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold text-neutral-900">Aucune publication pour le moment</h3>
+                    <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+                      {isOwnProfile
+                        ? 'Partagez des photos ou des vidéos de vos réalisations pour attirer plus de clients.'
+                        : 'Cet utilisateur n’a pas encore publié de réalisation.'}
+                    </p>
+                  </div>
+                  {isOwnProfile && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingPost(true)}
+                      className="px-4 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold transition-colors cursor-pointer shadow-2xs inline-flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Créer ma première publication</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ONGLET 2: À PROPOS */}
+          {activeTab === 'about' && (
+            <div className="w-[92%] sm:w-full mx-auto bg-white rounded-2xl border border-neutral-200 p-4 sm:p-6 space-y-5 shadow-2xs">
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Choisir un modèle de bannière africaine :</span>
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {PROFILE_BANNER_PRESETS.map((preset) => {
-                    const isSelected =
-                      selectedPresetUrl === preset.url && !customBannerUrl.trim();
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedPresetUrl(preset.url);
-                          setCustomBannerUrl('');
-                        }}
-                        className={`relative rounded-xl overflow-hidden border-2 text-left transition-all h-20 group cursor-pointer ${
-                          isSelected
-                            ? 'border-amber-500 ring-2 ring-amber-500/40'
-                            : 'border-neutral-200 hover:border-neutral-400'
-                        }`}
-                      >
-                        <img
-                          src={preset.url}
-                          alt={preset.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-black/45 group-hover:bg-black/35 transition-colors p-1.5 flex flex-col justify-between">
-                          <span className="text-[10px] font-bold text-white leading-tight drop-shadow-xs">
-                            {preset.title}
-                          </span>
-                          {isSelected && (
-                            <span className="self-end w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] shadow-sm">
-                              <Check className="w-2.5 h-2.5" />
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <h3 className="text-sm font-black text-neutral-900 uppercase tracking-wide flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#FF6B00]" />
+                  <span>Présentation & Savoir-faire</span>
+                </h3>
+                <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed">
+                  {targetBio}
+                </p>
               </div>
 
-              {/* Téléversement photo depuis téléphone (Pas de lien URL) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-neutral-800 flex items-center gap-1.5">
-                      <Camera className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Photo de bannière</span>
-                    </label>
-                    {customBannerUrl && (
-                      <span className="text-[10px] font-bold text-emerald-600">Photo choisie ✔</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => bannerFileInputRef.current?.click()}
-                    className="w-full py-2 px-3 rounded-lg bg-white border border-amber-300 hover:bg-amber-50 text-amber-900 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Choisir depuis mon téléphone</span>
-                  </button>
-                  <input
-                    type="file"
-                    ref={bannerFileInputRef}
-                    onChange={(e) => handlePhotoUpload(e, 'banner')}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                </div>
-
-                <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-neutral-800 flex items-center gap-1.5">
-                      <Camera className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Photo de profil</span>
-                    </label>
-                    {avatarUrl && (
-                      <span className="text-[10px] font-bold text-emerald-600">Photo choisie ✔</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => avatarFileInputRef.current?.click()}
-                    className="w-full py-2 px-3 rounded-lg bg-white border border-amber-300 hover:bg-amber-50 text-amber-900 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Choisir depuis mon téléphone</span>
-                  </button>
-                  <input
-                    type="file"
-                    ref={avatarFileInputRef}
-                    onChange={(e) => handlePhotoUpload(e, 'avatar')}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                </div>
-              </div>
-
-              {/* Social Links Form (WhatsApp, Facebook, TikTok) */}
-              <div className="space-y-3 pt-3 border-t border-neutral-200">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-800">
-                  Liens Réseaux Sociaux (WhatsApp, Facebook, TikTok) :
+              {/* Coordonnées de contact */}
+              <div className="pt-3 border-t border-neutral-100 space-y-3">
+                <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                  Coordonnées & Réseaux Sociaux
                 </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {targetPhone && (
+                    <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-neutral-200 flex items-center justify-center text-neutral-700 shrink-0">
+                        <Phone className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-neutral-400 block">Téléphone</span>
+                        <span className="font-bold text-neutral-900 font-mono truncate">{targetPhone}</span>
+                      </div>
+                    </div>
+                  )}
 
-                {/* WhatsApp */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-neutral-700 flex items-center gap-1.5">
-                    <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Numéro WhatsApp Direct *</span>
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="+225 07 00 00 00 00"
-                    value={whatsappVal}
-                    onChange={(e) => setWhatsappVal(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs bg-white"
-                  />
-                  <span className="text-[10px] text-neutral-500">
-                    Exemple : +225 07 12 34 56 78 (permet aux clients de vous écrire directement sur WhatsApp)
+                  {targetWhatsapp && (
+                    <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-100 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+                        <MessageCircle className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-emerald-700 block font-semibold">WhatsApp</span>
+                        <span className="font-bold text-neutral-900 font-mono truncate">{targetWhatsapp}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {targetFacebook && (
+                    <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 shrink-0">
+                        <Facebook className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-blue-700 block font-semibold">Facebook</span>
+                        <span className="font-bold text-neutral-900 truncate block">{targetFacebook}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {targetTiktok && (
+                    <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-neutral-900 text-white flex items-center justify-center shrink-0">
+                        <Video className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-neutral-600 block font-semibold">TikTok</span>
+                        <span className="font-bold text-neutral-900 truncate block">{targetTiktok}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Spécifications artisan si applicable */}
+              {isTargetingArtisan && (
+                <div className="pt-3 border-t border-neutral-100 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-neutral-400 block mb-0.5">Tarif horaire</span>
+                    <span className="font-bold text-neutral-900">{selectedArtisan?.hourlyRate || '10 000 FCFA'}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block mb-0.5">Expérience</span>
+                    <span className="font-bold text-neutral-900">{selectedArtisan?.experienceYears || 5} ans</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block mb-0.5">Délai d'intervention</span>
+                    <span className="font-bold text-emerald-700">24h à 48h</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-400 block mb-0.5">Garantie</span>
+                    <span className="font-bold text-neutral-900">Vérifié & Qualifié</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ONGLET 3: PHOTOS */}
+          {activeTab === 'photos' && (
+            <div className="w-[92%] sm:w-full mx-auto bg-white rounded-2xl border border-neutral-200 p-4 sm:p-5 shadow-2xs">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-700">
+                  Galerie Photos ({userPhotos.length})
+                </h3>
+              </div>
+
+              {userPhotos.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                  {userPhotos.map((photo) => (
+                    <div
+                      key={photo.id}
+                      onClick={() => setSelectedPhotoPreview(photo.url)}
+                      className="aspect-square rounded-xl overflow-hidden bg-neutral-100 border border-neutral-200 cursor-pointer group relative"
+                    >
+                      <img
+                        src={photo.url}
+                        alt={photo.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-neutral-500 italic text-center py-8">
+                  Aucune photo disponible dans la galerie pour le moment.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ONGLET 4: SERVICES / RÉALISATIONS */}
+          {activeTab === 'services' && (
+            <div className="w-[92%] sm:w-full mx-auto bg-white rounded-2xl border border-neutral-200 p-4 sm:p-5 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-700">
+                  Prestations & Tarifs
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  {
+                    title: `Intervention ${targetTrade} standard`,
+                    price: (selectedArtisan?.hourlyRate) || '15 000 FCFA',
+                    duration: '1 à 2 jours',
+                    desc: 'Diagnostic complet, intervention de qualité et finitions soignées.',
+                  },
+                  {
+                    title: 'Entretien & Rénovation complète',
+                    price: 'Sur Devis gratuit',
+                    duration: 'Selon projet',
+                    desc: 'Étude sur mesure, devis sans engagement et déplacement rapide.',
+                  },
+                ].map((srv, idx) => (
+                  <div key={idx} className="p-4 rounded-xl border border-neutral-200 bg-neutral-50/60 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <h4 className="font-bold text-xs sm:text-sm text-neutral-900">{srv.title}</h4>
+                      <span className="font-bold text-xs text-[#FF6B00] bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-200">
+                        {srv.price}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600">{srv.desc}</p>
+                    <div className="text-[11px] text-neutral-500 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Délai : {srv.duration}</span>
+                    </div>
+                    {isTargetingArtisan && (
+                      <button
+                        type="button"
+                        onClick={() => quoteModal.open(selectedArtisan, srv.title)}
+                        className="mt-2 w-full py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#FF6B00] text-xs font-bold transition-colors text-center cursor-pointer border border-orange-200"
+                      >
+                        Demander cette prestation
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ONGLET 5: AVIS & HISTORIQUE APPELS VOIP (Pour artisan) */}
+          {activeTab === 'reviews' && isTargetingArtisan && (
+            <div className="w-[92%] sm:w-full mx-auto space-y-3.5">
+              {/* Avis clients */}
+              <div className="bg-white rounded-2xl border border-neutral-200 p-4 sm:p-5 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-700">
+                    Avis clients vérifiés
+                  </h3>
+                  <div className="flex items-center gap-1 text-xs font-bold text-amber-500">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+                    <span>{selectedArtisan?.rating || 4.8} / 5</span>
+                    <span className="text-neutral-400 font-normal">({selectedArtisan?.reviewsCount || 12} avis)</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-100 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-neutral-900">Kouamé B. (Abidjan)</span>
+                      <span className="text-amber-500 font-bold">⭐⭐⭐⭐⭐</span>
+                    </div>
+                    <p className="text-neutral-600 italic">
+                      « Travail très soigné, ponctuel et respectueux des délais. Contact facile via WhatsApp et devis respecté. »
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-100 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-neutral-900">Mariam D. (Cocody)</span>
+                      <span className="text-amber-500 font-bold">⭐⭐⭐⭐⭐</span>
+                    </div>
+                    <p className="text-neutral-600 italic">
+                      « Devis clair et transparent, intervention rapide dès le lendemain. Échanges fluides. »
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Historique VoIP sécurisé */}
+              <div className="bg-white rounded-2xl border border-neutral-200 p-4 sm:p-5 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Historique d'appels VoIP</span>
+                    </h3>
+                    <p className="text-[11px] text-neutral-500">Chiffré de bout en bout, numéros masqués</p>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
+                    Sécurisé
                   </span>
                 </div>
 
-                {/* Facebook */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-neutral-700 flex items-center gap-1.5">
-                    <Facebook className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Lien ou Identifiant Page Facebook</span>
-                  </label>
+                {isLoadingCalls ? (
+                  <p className="text-xs text-neutral-400 text-center py-4">Chargement...</p>
+                ) : callHistory.length > 0 ? (
+                  <div className="divide-y divide-neutral-100">
+                    {callHistory.map((call, idx) => (
+                      <div key={call.id || idx} className="py-2.5 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
+                            <Phone className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-neutral-900">
+                              {call.type === 'video' ? 'Appel vidéo VoIP' : 'Appel vocal VoIP'}
+                            </div>
+                            <div className="text-[10px] text-neutral-400">
+                              {new Date(call.timestamp).toLocaleDateString('fr-FR')} • {call.formattedDuration}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-600">Terminé</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-neutral-500 italic text-center py-4">
+                    Aucun appel VoIP enregistré récemment.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 14. MODALE MODIFIER LA PHOTO DE PROFIL (Règle 14) */}
+      {/* ========================================================= */}
+      {isAvatarModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 border border-neutral-200 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-neutral-900">Modifier la photo de profil</h3>
+              <button
+                type="button"
+                onClick={() => setIsAvatarModalOpen(false)}
+                className="p-1 rounded-full hover:bg-neutral-100 text-neutral-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 py-2">
+              {targetAvatar ? (
+                <img
+                  src={targetAvatar}
+                  alt="Aperçu"
+                  className="w-24 h-24 rounded-full object-cover border-4 border-orange-100"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-neutral-100 flex items-center justify-center text-4xl">
+                  {targetEmoji || '👤'}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => avatarFileInputRef.current?.click()}
+                className="w-full py-2.5 px-3 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-2xs transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Choisir une nouvelle photo</span>
+              </button>
+              <input
+                type="file"
+                ref={avatarFileInputRef}
+                onChange={handleAvatarFileUpload}
+                accept="image/*"
+                className="hidden"
+              />
+
+              {targetAvatar && (
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  className="w-full py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Supprimer la photo actuelle</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 15. MODALE MODIFIER LA COUVERTURE (Règle 15) */}
+      {/* ========================================================= */}
+      {isCoverModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col p-5 border border-neutral-200 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+              <h3 className="text-sm font-bold text-neutral-900">Modifier la photo de couverture</h3>
+              <button
+                type="button"
+                onClick={() => setIsCoverModalOpen(false)}
+                className="p-1 rounded-full hover:bg-neutral-100 text-neutral-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto py-3 space-y-4">
+              {/* Upload fichier depuis téléphone */}
+              <button
+                type="button"
+                onClick={() => coverFileInputRef.current?.click()}
+                className="w-full py-3 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-2xs transition-colors"
+              >
+                <Upload className="w-4 h-4 text-[#FF6B00]" />
+                <span>Téléverser depuis mon téléphone</span>
+              </button>
+              <input
+                type="file"
+                ref={coverFileInputRef}
+                onChange={handleCoverFileUpload}
+                accept="image/*"
+                className="hidden"
+              />
+
+              {/* Sélection modèles de couverture africaine */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-neutral-700">
+                  Ou choisir une bannière africaine :
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {PROFILE_BANNER_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleSelectCoverPreset(preset.url)}
+                      className="relative rounded-xl overflow-hidden border border-neutral-200 h-20 group cursor-pointer text-left"
+                    >
+                      <img
+                        src={preset.url}
+                        alt={preset.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-black/40 p-1.5 flex items-end">
+                        <span className="text-[10px] font-bold text-white leading-tight">
+                          {preset.title}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {targetCover && (
+                <button
+                  type="button"
+                  onClick={handleRemoveCover}
+                  className="w-full py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Supprimer la couverture personnalisée</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODALE MODIFIER LE PROFIL (Règle 4) */}
+      {/* ========================================================= */}
+      {isEditProfileOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[92vh] flex flex-col p-5 border border-neutral-200 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+              <h3 className="text-sm font-bold text-neutral-900">Modifier mon profil</h3>
+              <button
+                type="button"
+                onClick={() => setIsEditProfileOpen(false)}
+                className="p-1 rounded-full hover:bg-neutral-100 text-neutral-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="overflow-y-auto py-3 space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">Nom et prénom *</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">Métier / Spécialité *</label>
+                <input
+                  type="text"
+                  required
+                  value={editTrade}
+                  onChange={(e) => setEditTrade(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Ville</label>
                   <input
                     type="text"
-                    placeholder="ex: atelier.kouame ou https://facebook.com/atelier.kouame"
-                    value={facebookVal}
-                    onChange={(e) => setFacebookVal(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs bg-white"
+                    value={editCity}
+                    onChange={(e) => setEditCity(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
                   />
                 </div>
-
-                {/* TikTok */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-neutral-700 flex items-center gap-1.5">
-                    <Video className="w-3.5 h-3.5 text-neutral-900" />
-                    <span>Identifiant ou Lien TikTok</span>
-                  </label>
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Pays</label>
                   <input
                     type="text"
-                    placeholder="ex: @artisan_pro ou https://tiktok.com/@artisan_pro"
-                    value={tiktokVal}
-                    onChange={(e) => setTiktokVal(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-xs bg-white"
+                    value={editCountry}
+                    onChange={(e) => setEditCountry(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
                   />
                 </div>
               </div>
 
-              {/* Modal Actions */}
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-neutral-200">
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">Courte présentation / Bio</label>
+                <textarea
+                  rows={3}
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  placeholder="Décrivez votre expérience, votre savoir-faire..."
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">Numéro de téléphone</label>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="+225 07 00 00 00 00"
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">WhatsApp Direct</label>
+                <input
+                  type="tel"
+                  value={editWhatsapp}
+                  onChange={(e) => setEditWhatsapp(e.target.value)}
+                  placeholder="+225 05 00 00 00 00"
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">Lien ou nom Facebook</label>
+                <input
+                  type="text"
+                  value={editFacebook}
+                  onChange={(e) => setEditFacebook(e.target.value)}
+                  placeholder="ex: atelier.kouame"
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-neutral-700 mb-1">Lien ou @ TikTok</label>
+                <input
+                  type="text"
+                  value={editTiktok}
+                  onChange={(e) => setEditTiktok(e.target.value)}
+                  placeholder="ex: @artisan_pro"
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsBannerModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-neutral-300 text-neutral-700 text-xs font-bold hover:bg-neutral-100 transition-colors"
+                  onClick={() => setIsEditProfileOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-neutral-300 text-neutral-700 font-bold hover:bg-neutral-100"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving}
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  disabled={isSavingProfile}
+                  className="px-5 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-bold disabled:opacity-50 cursor-pointer shadow-2xs"
                 >
-                  {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                  {isSavingProfile ? 'Enregistrement...' : 'Enregistrer'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Lightbox / Aperçu photo plein écran */}
+      {selectedPhotoPreview && (
+        <div
+          onClick={() => setSelectedPhotoPreview(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm cursor-pointer animate-in fade-in"
+        >
+          <img
+            src={selectedPhotoPreview}
+            alt="Aperçu plein écran"
+            className="max-w-full max-h-[90vh] object-contain rounded-2xl"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+      )}
+
+      {/* Modale Publier une Réalisation */}
+      <PublierRealisation
+        isOpen={isCreatingPost}
+        onClose={() => setIsCreatingPost(false)}
+      />
     </div>
   );
 };

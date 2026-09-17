@@ -1,10 +1,23 @@
 {
+  "accueil": "Accueil",
+  "marketplace": "Marketplace",
   "messages": "Messages",
+  "recherche": "Rechercher...",
+  "quoiDeNeuf": "Quoi de neuf, ",
+  "publierPost": "Publier un post",
+  "vendreArticle": "Vendre un article",
+  "nomArticle": "Nom de l'article",
+  "prix": "Votre prix",
+  "publier": "Publier",
+  "contacter": "Contacter le vendeur",
+  "verif": "Vérification Artisan",
+  "comment": "Comment ça marche?",
+  "propos": "À propos",
   "sousTitre": "Retrouvez vos contacts WhatsApp et discutez en toute sécurité.",
-  "recherche": "Rechercher un artisan, un service ou un message",
   "statuts": "STATUTS RÉCENTS",
   "ajouter": "Ajouter",
   "artisanPro": "Artisan pro MS",
   "parametres": "Paramètres",
-  "langue": "Langue"
+  "langue": "Langue",
+  "sortir": "Sortir"
 }

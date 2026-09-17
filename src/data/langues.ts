@@ -6,12 +6,26 @@ export interface LanguageTranslation {
   name: string;
   flag: string;
   code: string;
+  accueil: string;
+  Accueil: string;
+  marketplace: string;
   messages: string;
   Messages: string;
-  sousTitre: string;
-  SousTitre: string;
   recherche: string;
   Recherche: string;
+  quoiDeNeuf: string;
+  publierPost: string;
+  vendreArticle: string;
+  nomArticle: string;
+  prix: string;
+  publier: string;
+  Publier: string;
+  contacter: string;
+  verif: string;
+  comment: string;
+  propos: string;
+  sousTitre: string;
+  SousTitre: string;
   statuts: string;
   Statuts: string;
   ajouter: string;
@@ -25,10 +39,6 @@ export interface LanguageTranslation {
   Profil: string;
   abonnements?: string;
   Abonnements: string;
-  publier?: string;
-  Publier: string;
-  accueil?: string;
-  Accueil: string;
   connexion?: string;
   Connexion: string;
   deconnexion?: string;
@@ -62,6 +72,7 @@ export const langues: Record<LanguageCode, LanguageTranslation> = {
     name: "Français (France)",
     flag: "🇫🇷",
     code: "fr",
+    Accueil: frJson.accueil,
     Messages: frJson.messages,
     SousTitre: frJson.sousTitre,
     Recherche: frJson.recherche,
@@ -69,10 +80,9 @@ export const langues: Record<LanguageCode, LanguageTranslation> = {
     Ajouter: frJson.ajouter,
     Parametres: frJson.parametres,
     Langue: frJson.langue,
+    Publier: frJson.publier,
     Profil: "Profil",
     Abonnements: "Abonnements",
-    Publier: "Publier une réalisation",
-    Accueil: "Fil d'actualité",
     Connexion: "Connexion",
     Deconnexion: "Déconnexion",
     MotDePasseOublie: "Mot de passe oublié ?",
@@ -81,14 +91,15 @@ export const langues: Record<LanguageCode, LanguageTranslation> = {
     NouveauMotDePasse: "Nouveau mot de passe",
     ConfirmerMotDePasse: "Confirmer le mot de passe",
     SelectionnerPays: "Sélectionner un pays",
-    Sortir: "Sortir",
-    sortir: "Sortir",
+    Sortir: frJson.sortir,
+    sortir: frJson.sortir,
   },
   en: {
     ...enJson,
     name: "English",
     flag: "🇬🇧",
     code: "en",
+    Accueil: enJson.accueil,
     Messages: enJson.messages,
     SousTitre: enJson.sousTitre,
     Recherche: enJson.recherche,
@@ -96,10 +107,9 @@ export const langues: Record<LanguageCode, LanguageTranslation> = {
     Ajouter: enJson.ajouter,
     Parametres: enJson.parametres,
     Langue: enJson.langue,
+    Publier: enJson.publier,
     Profil: "Profile",
     Abonnements: "Subscriptions",
-    Publier: "Share a project",
-    Accueil: "News Feed",
     Connexion: "Sign In",
     Deconnexion: "Sign Out",
     MotDePasseOublie: "Forgot password?",
@@ -108,8 +118,8 @@ export const langues: Record<LanguageCode, LanguageTranslation> = {
     NouveauMotDePasse: "New password",
     ConfirmerMotDePasse: "Confirm password",
     SelectionnerPays: "Select country",
-    Sortir: "Exit",
-    sortir: "Exit",
+    Sortir: enJson.sortir,
+    sortir: enJson.sortir,
   },
 };
 
