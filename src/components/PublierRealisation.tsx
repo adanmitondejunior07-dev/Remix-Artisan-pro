@@ -241,7 +241,6 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
           mediaUrl: thumbUrl,
           posterUrl: thumbUrl,
           mediaId: `video_${newPost.id}`,
-          price: newPost.tarif.includes('FCFA') ? newPost.tarif : `${newPost.tarif} FCFA`,
           likesCount: 0,
           likedBy: [],
           viewsCount: 1,
@@ -309,7 +308,6 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
         content: newPhotoPost.description,
         mediaType: 'photo' as const,
         mediaUrl: newPhotoPost.image,
-        price: newPhotoPost.tarif.includes('FCFA') ? newPhotoPost.tarif : `${newPhotoPost.tarif} FCFA`,
         likesCount: 0,
         likedBy: [],
         viewsCount: 1,
@@ -491,29 +489,15 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
             </div>
           )}
 
-          {/* Tarif */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-600 mb-1">
-              Tarif / Prix de la prestation
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: 20 000 FCFA ou Sur devis"
-              value={tarif}
-              onChange={(e) => setTarif(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs font-bold focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
           {/* Description */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-neutral-600 mb-1">
-              Description de votre création
+              Description de votre publication
             </label>
             <textarea
               rows={3}
               required
-              placeholder="Décrivez votre création, matière première utilisée, délais de réalisation..."
+              placeholder="Décrivez votre création, matière première utilisée, détails de votre travail..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:border-emerald-500"

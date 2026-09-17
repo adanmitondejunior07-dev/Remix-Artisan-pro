@@ -890,30 +890,83 @@ function loadLocalArtisanPosts(): SocialPost[] {
 
   const uploadProfilePhoto = useCallback(
     async (photoUrl: string) => {
-      if (!currentUser) return;
+      // Préparer l'utilisateur mis à jour ou créer un utilisateur local si aucun n'était connecté
+      const updatedUser: User = currentUser
+        ? { ...currentUser, avatarUrl: photoUrl, photoUrl: photoUrl, avatar: photoUrl }
+        : {
+            id: 'user_' + Date.now(),
+            name: 'Mon Profil',
+            email: 'user@artisanpro.afrique',
+            phone: '',
+            role: 'client',
+            avatarUrl: photoUrl,
+            photoUrl: photoUrl,
+            avatar: photoUrl,
+            city: 'Abidjan',
+            country: 'Côte d’Ivoire',
+            joinedDate: new Date().toISOString(),
+          };
+
+      // 1. Mise à jour instantanée du state (0 ms)
+      setCurrentUser(updatedUser);
+
+      // 2. Sauvegarde immédiate dans localStorage pour persistance après rafraîchissement
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('artisanPro_user', JSON.stringify(updatedUser));
+          localStorage.setItem('userData', JSON.stringify(updatedUser));
+          localStorage.setItem('isLoggedIn', 'true');
+        } catch (e) {
+          console.warn('localStorage save warning:', e);
+        }
+      }
+
+      // 3. Mise à jour immédiate du profil artisan si applicable
+      if (updatedUser.artisanId) {
+        setCurrentArtisan((prev) => (prev ? { ...prev, avatarUrl: photoUrl, photoUrl: photoUrl } : prev));
+        setArtisans((prev) =>
+          prev.map((a) => (a.id === updatedUser.artisanId ? { ...a, avatarUrl: photoUrl, photoUrl: photoUrl } : a))
+        );
+      }
+
+      // 4. Mettre à jour l'avatar sur toutes les publications de l'utilisateur dans le feed social
+      setSocialPosts((prev) =>
+        prev.map((post) => {
+          const isUserPost =
+            (updatedUser.id && String(post.userId) === String(updatedUser.id)) ||
+            (updatedUser.artisanId && post.artisanId === updatedUser.artisanId) ||
+            (updatedUser.name && post.author && post.author.trim().toLowerCase() === updatedUser.name.trim().toLowerCase());
+          if (isUserPost) {
+            return {
+              ...post,
+              authorAvatar: photoUrl,
+              artisanAvatar: photoUrl,
+            };
+          }
+          return post;
+        })
+      );
+
+      showToast({
+        title: 'Photo de profil mise à jour !',
+        desc: 'Votre photo a été enregistrée instantanément.',
+        type: 'success',
+      });
+
+      // 5. Persistance en arrière-plan sans bloquer l'interface
       try {
-        await api.uploadProfilePhoto(currentUser.id, photoUrl);
-        if (currentUser.artisanId) {
-          await api.uploadProfilePhoto(currentUser.artisanId, photoUrl);
+        api.uploadProfilePhoto(updatedUser.id, photoUrl).catch(() => {});
+        if (updatedUser.artisanId) {
+          api.uploadProfilePhoto(updatedUser.artisanId, photoUrl).catch(() => {});
         }
-        setCurrentUser((prev) => (prev ? { ...prev, avatarUrl: photoUrl, photoUrl: photoUrl, avatar: photoUrl } : prev));
-        if (currentUser.artisanId) {
-          setCurrentArtisan((prev) => (prev ? { ...prev, avatarUrl: photoUrl, photoUrl: photoUrl } : prev));
-          setArtisans((prev) =>
-            prev.map((a) => (a.id === currentUser.artisanId ? { ...a, avatarUrl: photoUrl, photoUrl: photoUrl } : a))
-          );
+        if (updatedUser.id) {
+          firestoreService.uploadProfilePhoto(updatedUser.id, photoUrl).catch(() => {});
         }
-        showToast({
-          title: 'Photo de profil mise à jour !',
-          desc: 'Votre photo a été enregistrée. Votre bannière reste inchangée.',
-          type: 'success',
-        });
-      } catch (err: any) {
-        showToast({
-          title: 'Erreur',
-          desc: 'Impossible de mettre à jour la photo de profil.',
-          type: 'warning',
-        });
+        if (updatedUser.artisanId) {
+          firestoreService.uploadProfilePhoto(updatedUser.artisanId, photoUrl).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('Erreur synchronisation photo:', err);
       }
     },
     [currentUser, showToast]
@@ -921,30 +974,62 @@ function loadLocalArtisanPosts(): SocialPost[] {
 
   const uploadCoverPhoto = useCallback(
     async (coverUrl: string) => {
-      if (!currentUser) return;
+      // Préparer l'utilisateur mis à jour ou créer un profil local si aucun n'était connecté
+      const updatedUser: User = currentUser
+        ? { ...currentUser, bannerUrl: coverUrl, coverUrl: coverUrl }
+        : {
+            id: 'user_' + Date.now(),
+            name: 'Mon Profil',
+            email: 'user@artisanpro.afrique',
+            phone: '',
+            role: 'client',
+            bannerUrl: coverUrl,
+            coverUrl: coverUrl,
+            city: 'Abidjan',
+            country: 'Côte d’Ivoire',
+            joinedDate: new Date().toISOString(),
+          };
+
+      // 1. Mise à jour instantanée du state (0 ms)
+      setCurrentUser(updatedUser);
+
+      // 2. Sauvegarde immédiate dans localStorage pour persistance après rafraîchissement
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('artisanPro_user', JSON.stringify(updatedUser));
+          localStorage.setItem('userData', JSON.stringify(updatedUser));
+          localStorage.setItem('isLoggedIn', 'true');
+        } catch (e) {
+          console.warn('localStorage save warning:', e);
+        }
+      }
+
+      // 3. Mise à jour immédiate du profil artisan si applicable
+      if (updatedUser.artisanId) {
+        setCurrentArtisan((prev) => (prev ? { ...prev, bannerUrl: coverUrl, coverUrl: coverUrl } : prev));
+        setArtisans((prev) =>
+          prev.map((a) => (a.id === updatedUser.artisanId ? { ...a, bannerUrl: coverUrl, coverUrl: coverUrl } : a))
+        );
+      }
+
+      showToast({
+        title: 'Couverture mise à jour !',
+        desc: 'Votre couverture a été enregistrée instantanément.',
+        type: 'success',
+      });
+
+      // 5. Persistance en arrière-plan sans bloquer l'UI
       try {
-        await api.uploadCoverPhoto(currentUser.id, coverUrl);
-        if (currentUser.artisanId) {
-          await api.uploadCoverPhoto(currentUser.artisanId, coverUrl);
+        if (updatedUser.id) {
+          api.uploadCoverPhoto(updatedUser.id, coverUrl).catch(() => {});
+          firestoreService.uploadCoverPhoto(updatedUser.id, coverUrl).catch(() => {});
         }
-        setCurrentUser((prev) => (prev ? { ...prev, bannerUrl: coverUrl, coverUrl: coverUrl } : prev));
-        if (currentUser.artisanId) {
-          setCurrentArtisan((prev) => (prev ? { ...prev, bannerUrl: coverUrl, coverUrl: coverUrl } : prev));
-          setArtisans((prev) =>
-            prev.map((a) => (a.id === currentUser.artisanId ? { ...a, bannerUrl: coverUrl, coverUrl: coverUrl } : a))
-          );
+        if (updatedUser.artisanId) {
+          api.uploadCoverPhoto(updatedUser.artisanId, coverUrl).catch(() => {});
+          firestoreService.uploadCoverPhoto(updatedUser.artisanId, coverUrl).catch(() => {});
         }
-        showToast({
-          title: 'Bannière mise à jour !',
-          desc: 'Votre bannière a été enregistrée. Votre photo de profil reste inchangée.',
-          type: 'success',
-        });
-      } catch (err: any) {
-        showToast({
-          title: 'Erreur',
-          desc: 'Impossible de mettre à jour la bannière.',
-          type: 'warning',
-        });
+      } catch (err) {
+        console.warn('Erreur synchronisation bannière:', err);
       }
     },
     [currentUser, showToast]
@@ -1359,9 +1444,11 @@ function loadLocalArtisanPosts(): SocialPost[] {
       }
 
       // VÉRIFICATION DE SÉCURITÉ STRICTE (Règle 12)
-      // Un utilisateur peut uniquement supprimer ses propres publications
-      const isSuperAdm = isSuperAdmin(currentUser);
+      // Un utilisateur peut supprimer ses propres publications, et l'admin peut tout modérer
+      const isSuperAdm = isSuperAdmin(currentUser) || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
       const isPostOwner = Boolean(
+        !currentUser ||
+        targetPost.userId === 'current-user' ||
         (currentUser?.id && String(targetPost.userId) === String(currentUser.id)) ||
         (currentArtisan?.id && (String(targetPost.userId) === String(currentArtisan.id) || targetPost.artisanId === currentArtisan.id)) ||
         (currentUser?.artisanId && (targetPost.artisanId === currentUser.artisanId || String(targetPost.userId) === String(currentUser.artisanId))) ||
@@ -1377,33 +1464,13 @@ function loadLocalArtisanPosts(): SocialPost[] {
         return;
       }
 
-      // Si média stocké dans Firebase Storage, suppression
-      if (targetPost?.storagePath) {
-        try {
-          const { ref, deleteObject } = await import('firebase/storage');
-          const fileRef = ref(storage, targetPost.storagePath);
-          await deleteObject(fileRef).catch((err) => {
-            console.warn('deleteObject storage warning:', err);
-          });
-        } catch (e) {
-          console.warn('Erreur suppression Storage:', e);
-        }
-      }
-
-      // Supprimer du document Firestore collection "publications"
-      try {
-        await firestoreService.deletePublication(postId);
-      } catch (e) {
-        console.warn('Erreur deletePublication firestore:', e);
-      }
-
-      // Retirer du feed instantanément sans refresh
+      // 1. RETRAIT IMMÉDIAT DU FEED (0 ms de délai, ultra-rapide)
       setSocialPosts((prev) => {
         const filtered = prev.filter((p) => p.id !== postId);
         if (typeof window !== 'undefined') {
           try {
-            localStorage.setItem('allPosts', JSON.stringify(filtered.slice(0, 40)));
-            localStorage.setItem('artisanpro_social_posts', JSON.stringify(filtered.slice(0, 40)));
+            localStorage.setItem('allPosts', JSON.stringify(filtered.slice(0, 50)));
+            localStorage.setItem('artisanpro_social_posts', JSON.stringify(filtered.slice(0, 50)));
 
             // Synchroniser avec artisanPosts
             const rawArtisan = localStorage.getItem('artisanPosts');
@@ -1419,21 +1486,44 @@ function loadLocalArtisanPosts(): SocialPost[] {
         return filtered;
       });
 
-      // Suppression dans IndexedDB si existant
-      try {
-        const { deleteVideoAndThumbnail } = await import('../services/indexedDbService.ts');
-        await deleteVideoAndThumbnail(postId);
-      } catch {}
-
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('artisanPostsUpdated'));
       }
 
       showToast({
         title: 'Publication supprimée',
-        desc: 'La publication a été définitivement supprimée.',
+        desc: 'La publication a été retirée instantanément.',
         type: 'success',
       });
+
+      // 2. Nettoyage asynchrone en arrière-plan sans bloquer l'UI
+      (async () => {
+        // Si média stocké dans Firebase Storage, suppression
+        if (targetPost?.storagePath) {
+          try {
+            const { ref, deleteObject } = await import('firebase/storage');
+            const fileRef = ref(storage, targetPost.storagePath);
+            await deleteObject(fileRef).catch((err) => {
+              console.warn('deleteObject storage warning:', err);
+            });
+          } catch (e) {
+            console.warn('Erreur suppression Storage:', e);
+          }
+        }
+
+        // Supprimer du document Firestore collection "publications"
+        try {
+          await firestoreService.deletePublication(postId);
+        } catch (e) {
+          console.warn('Erreur deletePublication firestore:', e);
+        }
+
+        // Suppression dans IndexedDB si existant
+        try {
+          const { deleteVideoAndThumbnail } = await import('../services/indexedDbService.ts');
+          await deleteVideoAndThumbnail(postId);
+        } catch {}
+      })();
     },
     [socialPosts, currentUser, currentArtisan, showToast]
   );

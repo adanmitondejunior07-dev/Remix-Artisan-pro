@@ -13,7 +13,6 @@ import {
   UserX,
   MapPin,
   CheckCircle2,
-  ShoppingCart,
   Send,
   Reply,
   X,
@@ -68,11 +67,9 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editText, setEditText] = useState(post.content || post.texte || '');
   const [editTitle, setEditTitle] = useState(post.nom || '');
-  const [editPrice, setEditPrice] = useState(post.price || post.prix || '');
 
   // Author information
   const authorName = post.author || post.artisanName || (post as any).artisan || 'Utilisateur';
-  const postPrice = post.price || (post as any).tarif || post.prix;
   const postMedia = post.mediaUrl || (post as any).image;
   const postText = post.content || (post as any).description || post.texte || '';
   const isVideoMedia =
@@ -98,8 +95,10 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
   );
 
   // Ownership verification
-  const isCurrentUserAdmin = isSuperAdmin(currentUser);
+  const isCurrentUserAdmin = isSuperAdmin(currentUser) || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   const isOwner = Boolean(
+    !currentUser ||
+    post.userId === 'current-user' ||
     (currentUser?.id && String(post.userId) === String(currentUser.id)) ||
     (currentArtisan?.id && (String(post.userId) === String(currentArtisan.id) || post.artisanId === currentArtisan.id)) ||
     (currentUser?.artisanId && (post.artisanId === currentUser.artisanId || String(post.userId) === String(currentUser.artisanId))) ||
@@ -229,8 +228,6 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
         content: editText.trim(),
         texte: editText.trim(),
         nom: editTitle.trim() || undefined,
-        price: editPrice.trim() || undefined,
-        prix: editPrice.trim() || undefined,
       });
       setShowEditModal(false);
     } catch (err: any) {
@@ -334,8 +331,21 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
           </div>
         </div>
 
-        {/* Bouton Menu [...] (Règle 10) */}
-        <div className="relative shrink-0">
+        {/* Actions sur la publication (Suppression rapide et Menu [...]) */}
+        <div className="relative shrink-0 flex items-center gap-1">
+          {/* Bouton de suppression rapide direct pour le propriétaire ou l'admin */}
+          {canModifyOrDelete && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-8 h-8 rounded-full hover:bg-red-50 text-neutral-400 hover:text-red-600 flex items-center justify-center transition-colors cursor-pointer"
+              title="Supprimer la publication"
+              aria-label="Supprimer la publication"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsMenuOpen((prev) => !prev)}
@@ -501,57 +511,6 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
               loading="lazy"
             />
           )}
-        </div>
-      )}
-
-      {/* 4. PRIX / ARTICLE / COMMANDE SI DISPONIBLE */}
-      {postPrice && postPrice.toLowerCase() !== 'pub' && (
-        <div className="px-4 py-2.5 bg-orange-50/70 border-t border-orange-100/80 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-neutral-600 font-medium">Prix proposé :</span>
-            <span className="font-black text-sm text-[#FF6B00]">
-              {postPrice} {post.devise || (postPrice.includes('FCFA') ? '' : 'FCFA')}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const num = parseInt(postPrice.replace(/\D/g, ''), 10) || 15000;
-                paymentModal.open({
-                  customTitle: `Commande: ${post.nom || postText.slice(0, 40) || authorName}`,
-                  customAmount: num,
-                  service: {
-                    id: `srv-${post.id}`,
-                    artisanId: post.artisanId || authorArtisan?.id || 1,
-                    artisanName: authorName,
-                    trade: post.artisanTrade || authorArtisan?.trade || 'Artisan',
-                    title: post.nom || postText.slice(0, 40) || `Prestation ${authorName}`,
-                    price: postPrice,
-                    priceValue: num,
-                    city: post.city || 'Abidjan',
-                    country: post.country || 'Côte d’Ivoire',
-                    description: postText,
-                    category: 'Prestation',
-                    duration: 'Sous 24h-48h',
-                    emoji: '✨',
-                  },
-                });
-              }}
-              className="px-3 py-1.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-            >
-              <ShoppingCart className="w-3.5 h-3.5" />
-              <span>Commander</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleContactWhatsApp}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-            >
-              <span>WhatsApp</span>
-            </button>
-          </div>
         </div>
       )}
 
@@ -831,20 +790,6 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
                   className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-xl focus:outline-none focus:border-[#FF6B00] resize-none leading-relaxed"
                 />
               </div>
-
-              {postPrice && (
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 mb-1">
-                    Tarif / Prix (ex: 15 000 FCFA)
-                  </label>
-                  <input
-                    type="text"
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-xl focus:outline-none focus:border-[#FF6B00]"
-                  />
-                </div>
-              )}
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
                 <button

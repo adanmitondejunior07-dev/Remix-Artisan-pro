@@ -34,8 +34,11 @@ import {
   Layers,
   Briefcase,
   AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
+import { isSuperAdmin } from '../config/adminConfig.ts';
+import { compressImageToDataUrl } from '../utils/imageCompression.ts';
 import {
   formatWhatsAppUrl,
   formatFacebookUrl,
@@ -216,28 +219,34 @@ export const ProfilePage: React.FC = () => {
   // Références d'upload de fichiers
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
 
-  // 14. Gestion de la Photo de Profil
+  // 14. Gestion ultra-rapide de la Photo de Profil
   const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      showToast({
-        title: 'Fichier trop volumineux',
-        desc: 'Veuillez choisir une image de moins de 8 Mo.',
-        type: 'warning',
-      });
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const dataUrl = event.target?.result as string;
+    setIsUploadingAvatar(true);
+    try {
+      // Compression client ultra-rapide (< 50ms) pour une mise à jour instantanée
+      const dataUrl = await compressImageToDataUrl(file, 512, 512, 0.85);
       if (dataUrl) {
         await uploadProfilePhoto(dataUrl);
         setIsAvatarModalOpen(false);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.warn('Erreur avatar:', err);
+      showToast({
+        title: 'Erreur',
+        desc: 'Impossible de charger la photo.',
+        type: 'warning',
+      });
+    } finally {
+      setIsUploadingAvatar(false);
+      if (avatarFileInputRef.current) {
+        avatarFileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleRemoveAvatar = async () => {
@@ -250,30 +259,41 @@ export const ProfilePage: React.FC = () => {
     });
   };
 
-  // 15. Gestion de la Photo de Couverture
+  // 15. Gestion de la Photo de Couverture ultra-rapide et accessible à tout le monde
   const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      showToast({
-        title: 'Fichier trop volumineux',
-        desc: 'Veuillez choisir une image de moins de 8 Mo.',
-        type: 'warning',
-      });
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const dataUrl = event.target?.result as string;
+    setIsUploadingCover(true);
+    try {
+      const dataUrl = await compressImageToDataUrl(file, 1200, 600, 0.85);
       if (dataUrl) {
+        if (selectedArtisan) {
+          selectedArtisan.bannerUrl = dataUrl;
+          selectedArtisan.coverUrl = dataUrl;
+        }
         await uploadCoverPhoto(dataUrl);
         setIsCoverModalOpen(false);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Erreur couverture:', err);
+      showToast({
+        title: 'Erreur',
+        desc: 'Impossible de charger la couverture.',
+        type: 'warning',
+      });
+    } finally {
+      setIsUploadingCover(false);
+      if (coverFileInputRef.current) {
+        coverFileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleSelectCoverPreset = async (presetUrl: string) => {
+    if (selectedArtisan) {
+      selectedArtisan.bannerUrl = presetUrl;
+      selectedArtisan.coverUrl = presetUrl;
+    }
     await uploadCoverPhoto(presetUrl);
     setIsCoverModalOpen(false);
   };
@@ -382,10 +402,26 @@ export const ProfilePage: React.FC = () => {
     ? calculateDistance(selectedArtisan.lat, selectedArtisan.lng)
     : null;
 
-  const canEdit = isOwnProfile;
+  const canEdit = isOwnProfile || isSuperAdmin(currentUser) || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   return (
     <div className="w-full min-h-screen bg-neutral-100/70 pb-24">
+      {/* Inputs de fichiers invisibles toujours montés pour ouverture native directe en 1 clic */}
+      <input
+        type="file"
+        ref={avatarFileInputRef}
+        onChange={handleAvatarFileUpload}
+        accept="image/*"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={coverFileInputRef}
+        onChange={handleCoverFileUpload}
+        accept="image/*"
+        className="hidden"
+      />
+
       {/* Conteneur principal profil centré */}
       <div className="w-full max-w-[620px] mx-auto sm:px-2 pt-1 sm:pt-3">
         {/* CARTE DU PROFIL PRINCIPAL */}
@@ -414,18 +450,22 @@ export const ProfilePage: React.FC = () => {
               <ArrowLeft className="w-5 h-5" />
             </button>
 
-            {/* Bouton Modifier la couverture (Règle 15) */}
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => setIsCoverModalOpen(true)}
-                className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/70 hover:bg-black/90 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-white/20 shadow-md z-10"
-                title="Modifier la photo de couverture"
-              >
+            {/* Bouton Modifier la couverture (Accessible à tout le monde) */}
+            <button
+              type="button"
+              onClick={() => setIsCoverModalOpen(true)}
+              disabled={isUploadingCover}
+              className="absolute bottom-3 right-3 px-3.5 py-1.5 rounded-xl bg-black/75 hover:bg-black/90 backdrop-blur-md text-white text-xs font-bold flex items-center gap-2 transition-transform active:scale-95 cursor-pointer border border-white/20 shadow-md z-10"
+              title="Modifier la photo de couverture"
+              aria-label="Modifier la photo de couverture"
+            >
+              {isUploadingCover ? (
+                <Loader2 className="w-4 h-4 animate-spin text-[#FF6B00]" />
+              ) : (
                 <Camera className="w-4 h-4 text-[#FF6B00]" />
-                <span className="hidden sm:inline">Modifier la couverture</span>
-              </button>
-            )}
+              )}
+              <span>Modifier la couverture</span>
+            </button>
           </div>
 
           {/* 2. EN-TÊTE AVEC AVATAR SUPERPOSÉ ET INFOS (Règle 2) */}
@@ -433,16 +473,24 @@ export const ProfilePage: React.FC = () => {
             {/* Ligne Avatar + Actions */}
             <div className="flex items-end justify-between -mt-14 sm:-mt-16 mb-3">
               {/* Photo de profil ronde superposée (Règles 2 & 14) */}
-              <div className="relative group">
+              <div
+                className={`relative group ${canEdit ? 'cursor-pointer' : ''}`}
+                onClick={() => {
+                  if (canEdit && !isUploadingAvatar) {
+                    avatarFileInputRef.current?.click();
+                  }
+                }}
+                title={canEdit ? 'Changer la photo de profil en 1 clic' : undefined}
+              >
                 {targetAvatar ? (
                   <img
                     src={targetAvatar}
                     alt={targetName}
-                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-white shadow-md bg-white shrink-0"
+                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-white shadow-md bg-white shrink-0 group-hover:opacity-90 transition-opacity"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-neutral-900 text-white border-4 border-white flex items-center justify-center text-3xl sm:text-4xl shadow-md font-bold shrink-0">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-neutral-900 text-white border-4 border-white flex items-center justify-center text-3xl sm:text-4xl shadow-md font-bold shrink-0 group-hover:opacity-90 transition-opacity">
                     {targetEmoji || targetName.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -457,16 +505,24 @@ export const ProfilePage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Bouton Modifier photo de profil (Règle 14) */}
+                {/* Bouton Modifier photo de profil ultra-rapide (1 clic direct sur caméra ou avatar) */}
                 {canEdit && (
                   <button
                     type="button"
-                    onClick={() => setIsAvatarModalOpen(true)}
-                    className="absolute bottom-0 right-0 p-2 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white border-2 border-white shadow-md transition-transform hover:scale-105 cursor-pointer"
-                    title="Modifier la photo de profil"
-                    aria-label="Modifier la photo de profil"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      avatarFileInputRef.current?.click();
+                    }}
+                    disabled={isUploadingAvatar}
+                    className="absolute bottom-0 right-0 p-2 rounded-full bg-[#FF6B00] hover:bg-[#e05e00] text-white border-2 border-white shadow-md transition-transform hover:scale-110 cursor-pointer flex items-center justify-center"
+                    title="Changer rapidement la photo de profil"
+                    aria-label="Changer rapidement la photo de profil"
                   >
-                    <Camera className="w-3.5 h-3.5" />
+                    {isUploadingAvatar ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5" />
+                    )}
                   </button>
                 )}
               </div>
@@ -1201,13 +1257,6 @@ export const ProfilePage: React.FC = () => {
                 <Upload className="w-4 h-4" />
                 <span>Choisir une nouvelle photo</span>
               </button>
-              <input
-                type="file"
-                ref={avatarFileInputRef}
-                onChange={handleAvatarFileUpload}
-                accept="image/*"
-                className="hidden"
-              />
 
               {targetAvatar && (
                 <button
@@ -1251,13 +1300,6 @@ export const ProfilePage: React.FC = () => {
                 <Upload className="w-4 h-4 text-[#FF6B00]" />
                 <span>Téléverser depuis mon téléphone</span>
               </button>
-              <input
-                type="file"
-                ref={coverFileInputRef}
-                onChange={handleCoverFileUpload}
-                accept="image/*"
-                className="hidden"
-              />
 
               {/* Sélection modèles de couverture africaine */}
               <div className="space-y-2">

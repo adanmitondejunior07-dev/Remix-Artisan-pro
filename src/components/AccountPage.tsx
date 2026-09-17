@@ -58,6 +58,7 @@ import {
 import { MonetizationView } from './MonetizationView.tsx';
 import { AdminPage } from './AdminPage.tsx';
 import { ProfilePage } from './ProfilePage.tsx';
+import { compressImageToDataUrl } from '../utils/imageCompression.ts';
 import { BecomeArtisanModal } from './BecomeArtisanModal.tsx';
 import { Wallet, Shield } from 'lucide-react';
 import { isExactAdminEmail, isSuperAdmin } from '../config/adminConfig.ts';
@@ -201,29 +202,23 @@ export const AccountPage: React.FC = () => {
     }
   };
 
-  const handleImageUpload = (
+  const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     type: 'banner' | 'avatar'
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size limit (< 4MB for high quality)
-    if (file.size > 4 * 1024 * 1024) {
-      showToast({
-        title: 'Image trop volumineuse',
-        desc: 'Veuillez choisir une photo inférieure à 4 Mo.',
-        type: 'warning',
-      });
-      return;
-    }
+    try {
+      const result =
+        type === 'banner'
+          ? await compressImageToDataUrl(file, 1200, 600, 0.85)
+          : await compressImageToDataUrl(file, 512, 512, 0.85);
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const result = reader.result as string;
+      if (!result) return;
+
       if (type === 'banner') {
         setFormData((prev) => ({ ...prev, bannerUrl: result }));
-        // Règle d'or : Sauvegarde immédiate avec update() / set(merge:true), ne touche PAS à la photo de profil
         try {
           await uploadCoverPhoto(result);
         } catch (err) {
@@ -231,15 +226,15 @@ export const AccountPage: React.FC = () => {
         }
       } else {
         setFormData((prev) => ({ ...prev, avatarUrl: result }));
-        // Règle d'or : Sauvegarde immédiate avec update() / set(merge:true), ne touche PAS à la bannière
         try {
           await uploadProfilePhoto(result);
         } catch (err) {
           console.warn('Erreur sauvegarde directe photo profil:', err);
         }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Erreur compression image:', err);
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {

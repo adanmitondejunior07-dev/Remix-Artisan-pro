@@ -257,7 +257,6 @@ export const ArtisanDashboardTable: React.FC<ArtisanDashboardTableProps> = ({
             <thead>
               <tr className="border-b border-neutral-200 bg-neutral-50/80 text-[11px] font-black uppercase tracking-wider text-neutral-600">
                 <th className="py-3.5 px-5">Photo / Vidéo</th>
-                <th className="py-3.5 px-5">Tarif</th>
                 <th className="py-3.5 px-5 min-w-[240px]">Description</th>
                 <th className="py-3.5 px-5 text-right">Actions</th>
               </tr>
@@ -312,14 +311,7 @@ export const ArtisanDashboardTable: React.FC<ArtisanDashboardTableProps> = ({
                       </div>
                     </td>
 
-                    {/* Colonne 2 : Tarif */}
-                    <td className="py-3.5 px-5 font-black text-neutral-950 whitespace-nowrap">
-                      <span className="inline-block px-3 py-1.5 rounded-xl bg-orange-50 text-[#FF6B00] border border-orange-200/80 text-xs font-black shadow-2xs">
-                        {post.tarif || 'Sur devis'}
-                      </span>
-                    </td>
-
-                    {/* Colonne 3 : Description */}
+                    {/* Colonne 2 : Description */}
                     <td className="py-3.5 px-5">
                       <p className="font-medium text-neutral-800 line-clamp-2 leading-relaxed text-xs sm:text-sm">
                         {post.description || 'Création artisanale'}
@@ -430,8 +422,8 @@ export const ArtisanDashboardTable: React.FC<ArtisanDashboardTableProps> = ({
                 <span className="text-xs font-bold text-neutral-500">
                   {activePreviewPost.date ? `Publié le ${activePreviewPost.date}` : 'Artisan Pro'}
                 </span>
-                <span className="px-3 py-1 rounded-xl bg-orange-50 text-[#FF6B00] border border-orange-200 text-sm font-black">
-                  {activePreviewPost.tarif}
+                <span className="text-xs font-semibold text-neutral-400">
+                  Publication {activePreviewPost.mediaType === 'video' ? 'Vidéo' : 'Photo'}
                 </span>
               </div>
               <p className="text-sm text-neutral-800 leading-relaxed font-medium">
