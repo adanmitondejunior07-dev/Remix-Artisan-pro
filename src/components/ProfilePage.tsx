@@ -75,6 +75,7 @@ export const ProfilePage: React.FC = () => {
     uploadProfilePhoto,
     uploadCoverPhoto,
     refreshData,
+    users,
   } = useApp();
 
   // 1. Détermination du profil cible (Profil personnel vs Visite d'un autre profil)
@@ -106,6 +107,19 @@ export const ProfilePage: React.FC = () => {
   const targetEmail = isOwnProfile
     ? (currentUser?.email || currentArtisan?.email || '')
     : (selectedArtisan?.email || selectedUser?.email || '');
+
+  const targetUserObj = selectedUser || users.find(
+    (u) =>
+      (selectedUser && u.id === selectedUser.id) ||
+      (selectedArtisan && u.artisanId === selectedArtisan.id) ||
+      (targetEmail && u.email && u.email.trim().toLowerCase() === targetEmail.trim().toLowerCase())
+  );
+
+  const canShowEmail = Boolean(
+    isOwnProfile ||
+    isSuperAdmin(currentUser) ||
+    targetUserObj?.showEmailPublicly === true
+  );
 
   const targetTrade = isOwnProfile
     ? (currentArtisan?.trade || (currentUser?.role === 'artisan' ? 'Artisan Professionnel' : 'Membre Particulier'))
@@ -239,6 +253,7 @@ export const ProfilePage: React.FC = () => {
   const [editWhatsapp, setEditWhatsapp] = useState(targetWhatsapp);
   const [editFacebook, setEditFacebook] = useState(targetFacebook);
   const [editTiktok, setEditTiktok] = useState(targetTiktok);
+  const [editShowEmailPublicly, setEditShowEmailPublicly] = useState(currentUser?.showEmailPublicly ?? false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // État pour modification ultra-rapide du nom (1 clic / inline)
@@ -257,6 +272,7 @@ export const ProfilePage: React.FC = () => {
     setEditWhatsapp(isOwnProfile ? (currentUser?.whatsapp || currentArtisan?.whatsapp || targetWhatsapp) : targetWhatsapp);
     setEditFacebook(isOwnProfile ? (currentUser?.facebook || currentArtisan?.facebook || targetFacebook) : targetFacebook);
     setEditTiktok(isOwnProfile ? (currentUser?.tiktok || currentArtisan?.tiktok || targetTiktok) : targetTiktok);
+    setEditShowEmailPublicly(currentUser?.showEmailPublicly ?? false);
   }, [isOwnProfile, currentUser, currentArtisan, targetName, targetEmail, targetTrade, targetCity, targetCountry, targetBio, targetPhone, targetWhatsapp, targetFacebook, targetTiktok]);
 
   const handleQuickSaveName = async (e?: React.FormEvent) => {
@@ -415,6 +431,7 @@ export const ProfilePage: React.FC = () => {
             tiktok: editTiktok.trim(),
             trade: editTrade.trim(),
             bio: editBio.trim(),
+            showEmailPublicly: editShowEmailPublicly,
           },
           (currentUser.role === 'artisan' || currentArtisan)
             ? {
@@ -1104,16 +1121,16 @@ export const ProfilePage: React.FC = () => {
               {/* Coordonnées de contact */}
               <div className="pt-3 border-t border-neutral-100 space-y-3">
                 <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
-                  Coordonnées & Réseaux Sociaux
+                  Informations de contact
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  {targetEmail && (
+                  {canShowEmail && targetEmail && (
                     <div className="p-3 rounded-xl bg-orange-50/60 border border-orange-100 flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-[#FF6B00] shrink-0">
                         <Mail className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <span className="text-[10px] text-[#FF6B00] font-bold block">Email du profil</span>
+                        <span className="text-[10px] text-[#FF6B00] font-bold block">📧 Email :</span>
                         <a
                           href={`mailto:${targetEmail}`}
                           className="font-bold text-neutral-900 font-mono truncate block hover:text-[#FF6B00] hover:underline"
@@ -1124,14 +1141,46 @@ export const ProfilePage: React.FC = () => {
                     </div>
                   )}
 
+                  {!canShowEmail && !isOwnProfile && targetEmail && (
+                    <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center justify-between gap-3 sm:col-span-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-neutral-200 flex items-center justify-center text-neutral-600 shrink-0">
+                          <Mail className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-neutral-500 font-bold block">📧 Email privé (masqué)</span>
+                          <span className="text-xs text-neutral-600 font-medium">L'utilisateur protège son adresse email.</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isTargetingArtisan && selectedArtisan) {
+                            startChatWithArtisan(selectedArtisan);
+                          } else {
+                            showToast({
+                              title: 'Message privé',
+                              desc: `Ouverture de la messagerie pour contacter ${targetName}...`,
+                              type: 'info',
+                            });
+                            go('messages');
+                          }
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                      >
+                        Contacter
+                      </button>
+                    </div>
+                  )}
+
                   {targetPhone && (
                     <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100 flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-neutral-200 flex items-center justify-center text-neutral-700 shrink-0">
                         <Phone className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <span className="text-[10px] text-neutral-400 block">Téléphone</span>
-                        <span className="font-bold text-neutral-900 font-mono truncate">{targetPhone}</span>
+                        <span className="text-[10px] text-neutral-400 font-bold block">📞 Téléphone :</span>
+                        <span className="font-bold text-neutral-900 font-mono truncate block">{targetPhone}</span>
                       </div>
                     </div>
                   )}
@@ -1623,6 +1672,26 @@ export const ProfilePage: React.FC = () => {
                   placeholder="ex: @artisan_pro"
                   className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
                 />
+              </div>
+
+              {/* Confidentialité de l'email */}
+              <div className="pt-2 border-t border-neutral-100">
+                <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-neutral-200 bg-neutral-50/80 cursor-pointer hover:bg-neutral-100/70 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={editShowEmailPublicly}
+                    onChange={(e) => setEditShowEmailPublicly(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 text-[#FF6B00] rounded border-neutral-300 focus:ring-[#FF6B00]"
+                  />
+                  <div>
+                    <span className="font-bold text-neutral-900 block text-xs">
+                      Afficher publiquement mon adresse email
+                    </span>
+                    <span className="text-[11px] text-neutral-500 leading-tight block">
+                      Si décoché, votre adresse restera confidentielle et un bouton "Contacter" sera proposé aux visiteurs.
+                    </span>
+                  </div>
+                </label>
               </div>
 
               <div className="pt-2 flex justify-end gap-2">

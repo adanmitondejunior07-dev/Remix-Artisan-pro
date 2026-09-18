@@ -16,11 +16,13 @@ export const SearchPage: React.FC = () => {
     calculateDistance,
     userLocation,
     requestUserLocation,
+    currentUser,
     go,
     t,
   } = useApp();
 
-  const [selectedCountry, setSelectedCountry] = useState<string>('Tous les pays');
+  const [selectedCountry, setSelectedCountry] = useState<string>(() => currentUser?.country || 'Tous les pays');
+  const [selectedCityState, setSelectedCityState] = useState<string>(() => currentUser?.city || '');
   const [verifiedOnly, setVerifiedOnly] = useState<boolean>(false);
   const [sortByDistance, setSortByDistance] = useState<boolean>(false);
 
@@ -129,6 +131,34 @@ export const SearchPage: React.FC = () => {
     userLocation,
     calculateDistance,
   ]);
+
+  // Section 3: Artisans proches de vous (même ville ou proches géographiquement)
+  const nearbyArtisans = useMemo(() => {
+    const userCity = (currentUser?.city || '').trim().toLowerCase();
+
+    return artisans
+      .filter((a) => {
+        // 1. Même ville que l'utilisateur
+        if (userCity && a.city && a.city.trim().toLowerCase() === userCity) {
+          return true;
+        }
+        // 2. Proximité GPS <= 35 km
+        if (userLocation && a.lat && a.lng) {
+          const dist = calculateDistance(a.lat, a.lng);
+          return dist !== null && dist <= 35;
+        }
+        return false;
+      })
+      .sort((a, b) => {
+        if (userLocation && a.lat && a.lng && b.lat && b.lng) {
+          const distA = calculateDistance(a.lat, a.lng) ?? 999;
+          const distB = calculateDistance(b.lat, b.lng) ?? 999;
+          return distA - distB;
+        }
+        return (b.rating || 0) - (a.rating || 0);
+      })
+      .slice(0, 6);
+  }, [artisans, currentUser, userLocation, calculateDistance]);
 
   const handleClearFilters = () => {
     setSearchQuery('');
@@ -254,6 +284,26 @@ export const SearchPage: React.FC = () => {
             </select>
           </div>
 
+          {/* Trier par distance (Demande utilisateur Section 3) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (!userLocation) {
+                requestUserLocation();
+              }
+              setSortByDistance((prev) => !prev);
+            }}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              sortByDistance
+                ? 'bg-[#FF6B00] text-white border-[#FF6B00] shadow-2xs'
+                : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-300 text-neutral-700'
+            }`}
+            title="Trier la liste par distance kilométrique"
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            <span>Trier par distance {sortByDistance && '✓'}</span>
+          </button>
+
           {/* Verified toggle */}
           <label className="flex items-center gap-1.5 text-xs font-medium text-neutral-700 cursor-pointer ml-auto">
             <input
@@ -266,7 +316,7 @@ export const SearchPage: React.FC = () => {
             <span>Vérifiés uniquement</span>
           </label>
 
-          {(searchQuery || selectedCountry !== 'Tous les pays' || (selectedTrade && selectedTrade !== 'Tous les métiers') || (selectedCity && selectedCity !== 'Toutes les villes') || verifiedOnly) && (
+          {(searchQuery || selectedCountry !== 'Tous les pays' || (selectedTrade && selectedTrade !== 'Tous les métiers') || (selectedCity && selectedCity !== 'Toutes les villes') || verifiedOnly || sortByDistance) && (
             <button
               onClick={handleClearFilters}
               className="text-xs text-amber-600 hover:text-amber-700 font-semibold underline underline-offset-2"
@@ -276,6 +326,47 @@ export const SearchPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* SECTION 3 : Artisans proches de vous (En dessous des filtres) */}
+      {nearbyArtisans.length > 0 && (
+        <div className="bg-gradient-to-r from-orange-50/70 to-amber-50/40 rounded-2xl border border-orange-200 p-5 space-y-4 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#FF6B00] text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                📍
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-neutral-900 flex items-center gap-2">
+                  Artisans proches de vous
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-[#FF6B00] border border-orange-200">
+                    {currentUser?.city ? currentUser.city : 'Votre secteur'}
+                  </span>
+                </h2>
+                <p className="text-xs text-neutral-600">
+                  Artisans situés dans la même ville ou proches géographiquement pour une intervention rapide.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!userLocation) requestUserLocation();
+                setSortByDistance(true);
+              }}
+              className="self-start sm:self-auto text-xs font-bold text-[#FF6B00] hover:text-[#e05e00] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              Voir par distance la plus proche →
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {nearbyArtisans.map((artisan) => (
+              <ArtisanCard key={`nearby-${artisan.id}`} artisan={artisan} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Results Header */}
       <div className="flex items-center justify-between">

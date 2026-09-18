@@ -290,9 +290,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedCity, setSelectedCity] = useState<string>('');
 
   // Geolocation
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => {
+    if (currentUser?.latitude && currentUser?.longitude) {
+      return { lat: currentUser.latitude, lng: currentUser.longitude };
+    }
+    return null;
+  });
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (currentUser?.latitude && currentUser?.longitude) {
+      setUserLocation({ lat: currentUser.latitude, lng: currentUser.longitude });
+    }
+  }, [currentUser?.latitude, currentUser?.longitude]);
 
   // Follow artisans
   const [followingArtisans, setFollowingArtisans] = useState<number[]>(() => {
@@ -1256,8 +1267,8 @@ function loadLocalArtisanPosts(): SocialPost[] {
             emoji: '🛠️',
             services: ['Prestations & Chantiers'],
             description: currentUser.bio || 'Artisan professionnel vérifié. Disponible pour tous travaux.',
-            lat: 5.3484,
-            lng: -4.0180,
+            lat: currentUser.latitude || 5.3484,
+            lng: currentUser.longitude || -4.0180,
             verified: true,
             is_verified: true,
             hasPaid10k: true,

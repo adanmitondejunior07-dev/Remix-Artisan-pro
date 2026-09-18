@@ -52,6 +52,9 @@ import { AdminMonetizationSection } from './AdminMonetizationSection.tsx';
 import { Admin3RolesBanner } from './Admin3RolesBanner.tsx';
 import { AdminTechniqueCinetPaySection } from './AdminTechniqueCinetPaySection.tsx';
 import { AdminPaymentsPage } from './AdminPaymentsPage.tsx';
+import { AdminUsersSection } from './AdminUsersSection.tsx';
+import { AdminPublicationsSection } from './AdminPublicationsSection.tsx';
+import { TestProtocolModal } from './TestProtocolModal.tsx';
 import {
   PERMANENT_OFFICIAL_CHANNELS,
   cleanAndNormalizeLink,
@@ -127,6 +130,7 @@ export const AdminPage: React.FC = () => {
     showToast,
     officialChannels,
     updateOfficialChannels,
+    socialPosts,
   } = useApp();
 
   // SÉCURITÉ : Vérifier côté client et logique que seul super_admin peut accéder
@@ -145,7 +149,7 @@ export const AdminPage: React.FC = () => {
   const [payments, setPayments] = useState<PaymentTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminTab, setAdminTab] = useState<
-    'withdrawals' | 'artisans' | 'monetization' | 'clients' | 'announcements' | 'business_links' | 'permissions' | 'subscriptions' | 'paiements' | 'private_account' | 'technique_cinetpay'
+    'withdrawals' | 'artisans' | 'monetization' | 'clients' | 'publications' | 'announcements' | 'business_links' | 'permissions' | 'subscriptions' | 'paiements' | 'private_account' | 'technique_cinetpay'
   >('withdrawals');
   const [withdrawalStatusFilter, setWithdrawalStatusFilter] = useState<'all' | 'en_attente' | 'approuve' | 'refuse'>('all');
 
@@ -528,6 +532,7 @@ export const AdminPage: React.FC = () => {
 
   // État du modal de retrait Fondateur
   const [showFounderWithdrawModal, setShowFounderWithdrawModal] = useState(false);
+  const [showTestProtocolModal, setShowTestProtocolModal] = useState(false);
   const [founderOperator, setFounderOperator] = useState<'Wave' | 'Orange Money' | 'MTN' | 'Monniz'>('Wave');
   const [founderPhone, setFounderPhone] = useState('+225 0503444508');
   const [founderAmount, setFounderAmount] = useState('54050');
@@ -1516,7 +1521,19 @@ export const AdminPage: React.FC = () => {
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>Clients & Utilisateurs ({users.length})</span>
+          <span>Gestion des Utilisateurs</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('publications')}
+          className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'publications'
+              ? 'bg-[#FF6B00] text-white shadow-xs'
+              : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>Publications des Artisans ({socialPosts.length})</span>
         </button>
 
         <button
@@ -1605,6 +1622,15 @@ export const AdminPage: React.FC = () => {
         >
           <CreditCard className="w-4 h-4" />
           <span>Paiements</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowTestProtocolModal(true)}
+          className="px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer bg-purple-600 hover:bg-purple-700 text-white shadow-xs ml-auto"
+        >
+          <ShieldAlert className="w-4 h-4 text-purple-200" />
+          <span>Protocole de Test Global</span>
         </button>
       </div>
 
@@ -1985,76 +2011,17 @@ export const AdminPage: React.FC = () => {
         <AdminMonetizationSection onRefresh={loadAdminData} />
       )}
 
-      {/* SECTION 3: CLIENTS / USERS MANAGEMENT */}
+      {/* SECTION 3: GESTION DES UTILISATEURS (Clients, Artisans, Admins) */}
       {adminTab === 'clients' && (
-        <div className="bg-white rounded-3xl border border-neutral-200 p-6 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-bold text-neutral-900">Liste de tous les Clients & Utilisateurs</h2>
-              <p className="text-xs text-neutral-500">
-                Consultez tous les comptes clients inscrits et supprimez les comptes indésirables en un clic.
-              </p>
-            </div>
-            {/* Search Input */}
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Rechercher un client..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-300 text-xs focus:outline-none focus:border-[#FF6B00]"
-              />
-            </div>
-          </div>
+        <AdminUsersSection
+          bannedUserIds={bannedUserIds}
+          onToggleBanUser={toggleBanUser}
+        />
+      )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-neutral-700">
-              <thead className="bg-neutral-50 text-[11px] font-bold uppercase text-neutral-400 border-y border-neutral-100">
-                <tr>
-                  <th className="py-3 px-4">Nom</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Téléphone</th>
-                  <th className="py-3 px-4">Rôle</th>
-                  <th className="py-3 px-4">Ville</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {filteredClients.map((u) => (
-                  <tr key={u.id} className="hover:bg-neutral-50/60 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-neutral-900">
-                      <div>{u.name}</div>
-                      <div className="text-[10px] text-neutral-400 font-mono">ID: {u.id}</div>
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-neutral-600">{u.email}</td>
-                    <td className="py-3.5 px-4 font-mono text-neutral-600">{u.phone}</td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 capitalize">
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-neutral-600">{u.city}</td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={async () => {
-                          if (confirm(`Supprimer l'utilisateur ${u.name} (${u.email}) ?`)) {
-                            await deleteUser(u.id);
-                          }
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs inline-flex items-center gap-1 border border-red-200 transition-colors cursor-pointer"
-                        title="Supprimer l'utilisateur"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Supprimer</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* SECTION 3B: PUBLICATIONS DES ARTISANS */}
+      {adminTab === 'publications' && (
+        <AdminPublicationsSection />
       )}
 
       {/* SECTION 4: ANNOUNCEMENTS */}
@@ -3393,6 +3360,14 @@ export const AdminPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal du Protocole de Test Automatisé */}
+      {showTestProtocolModal && (
+        <TestProtocolModal
+          isOpen={showTestProtocolModal}
+          onClose={() => setShowTestProtocolModal(false)}
+        />
       )}
     </div>
   );

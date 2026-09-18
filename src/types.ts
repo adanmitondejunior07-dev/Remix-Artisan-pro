@@ -104,11 +104,19 @@ export type MonetizationStatus =
 export interface User {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   role: UserRole;
   phone: string;
   city: string;
   country: string;
+  latitude?: number;
+  longitude?: number;
+  location_authorized?: boolean;
+  showLocationPublicly?: boolean;
+  showEmailPublicly?: boolean;
+  account_status?: 'active' | 'suspended' | 'pending';
   artisanId?: number;
   avatar?: string;
   avatarUrl?: string;
@@ -360,6 +368,10 @@ export interface SocialPost {
   createdAt: string;
   phone?: string;
   whatsapp?: string;
+  visibility?: 'public' | 'private' | 'hidden';
+  status?: 'published' | 'hidden' | 'flagged' | 'moderated';
+  userRole?: string;
+  flagged?: boolean;
 }
 
 export interface WithdrawalRequest {
