@@ -84,7 +84,7 @@ export const PortefeuilleClient: React.FC<PortefeuilleClientProps> = ({ onUpgrad
         operator: 'Orange Money',
         date: new Date(Date.now() - 3600000 * 24).toISOString(),
         status: 'succes',
-        artisanName: 'Kouassi Yao',
+        artisanName: 'Amara Sylla',
         reference: 'OM-390192',
       },
     ];

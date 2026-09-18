@@ -487,7 +487,7 @@ export default function Messages() {
                     type="button"
                     onClick={() => {
                       setViewingStatus({
-                        name: 'Yao',
+                        name: 'Yves',
                         letter: 'Y',
                         color: 'bg-[#1e293b]',
                         time: 'Il y a 2h',
@@ -495,11 +495,11 @@ export default function Messages() {
                       });
                     }}
                     className="w-16 h-16 rounded-full bg-[#1e293b] border-2 border-yellow-400 flex items-center justify-center text-white font-bold text-xl shadow-md transition-transform hover:scale-105 cursor-pointer focus:outline-none"
-                    title="Voir le statut de Yao"
+                    title="Voir le statut de Yves"
                   >
                     Y
                   </button>
-                  <span className="text-gray-400 text-xs mt-1">Yao</span>
+                  <span className="text-gray-400 text-xs mt-1">Yves</span>
                 </div>
 
                 {/* O */}

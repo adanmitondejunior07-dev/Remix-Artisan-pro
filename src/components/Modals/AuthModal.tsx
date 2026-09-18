@@ -472,11 +472,11 @@ export const AuthModal: React.FC = () => {
     },
     {
       id: 'user-artisan-1',
-      name: 'Yao Kouassi',
-      email: 'yao.kouassi@artisanpro.africa',
+      name: 'Aïcha Koné',
+      email: 'aicha.kone@artisanpro.africa',
       role: 'artisan' as const,
       artisanId: 1,
-      detail: 'Artisan Couturier · Profil vérifié · Monétisation',
+      detail: 'Artisan Couturière · Profil vérifié · Monétisation',
       badge: 'Artisan Vérifié',
       badgeColor: 'bg-orange-100 text-orange-900 border border-orange-300',
       emoji: '👗',
@@ -746,7 +746,7 @@ export const AuthModal: React.FC = () => {
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Ex: Yao Kouassi ou Aminata Touré"
+                    placeholder="Ex: Jean-Luc Koffi ou Aminata Touré"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-xs font-semibold text-neutral-900 focus:outline-none focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00]/20"
                   />
                 </div>

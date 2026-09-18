@@ -58,7 +58,7 @@
     },
     {
       "id": 3,
-      "name": "Koffi Yao",
+      "name": "Koffi Brou",
       "trade": "Mécanicien",
       "city": "Bouaké",
       "country": "Côte d’Ivoire",
@@ -460,7 +460,7 @@
     {
       "id": "srv-5",
       "artisanId": 3,
-      "artisanName": "Koffi Yao",
+      "artisanName": "Koffi Brou",
       "trade": "Mécanicien",
       "title": "Vidange intégrale & Révision 30 points",
       "price": "20 000 FCFA",

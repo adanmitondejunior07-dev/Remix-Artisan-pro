@@ -1317,7 +1317,7 @@ export const AccountPage: React.FC = () => {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 text-sm focus:border-amber-500 focus:outline-none bg-white"
-                    placeholder="Ex. Yao Kouassi Couture"
+                    placeholder="Ex. Atelier Couture & Création"
                   />
                 </div>
 

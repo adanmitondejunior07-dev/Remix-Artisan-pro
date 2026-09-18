@@ -126,7 +126,7 @@ const defaultArtisans: Artisan[] = [
   },
   {
     id: 3,
-    name: 'Koffi Yao',
+    name: 'Koffi Brou',
     trade: 'Mécanicien',
     city: 'Bouaké',
     country: 'Côte d’Ivoire',
@@ -137,7 +137,7 @@ const defaultArtisans: Artisan[] = [
     services: ['Entretien', 'Freins', 'Diagnostic'],
     description: 'Garage automobile toutes marques. Spécialiste moteurs diesel et essence, vidanges, suspensions et diagnostics électroniques complets.',
     phone: '+225 01 23 45 67',
-    email: 'koffi.yao@artisanpro.africa',
+    email: 'koffi.brou@artisanpro.africa',
     lat: 7.6898,
     lng: -5.0300,
     verified: true,
@@ -461,7 +461,7 @@ const defaultServices: MarketplaceService[] = [
   {
     id: 'srv-5',
     artisanId: 3,
-    artisanName: 'Koffi Yao',
+    artisanName: 'Koffi Brou',
     trade: 'Mécanicien',
     title: 'Vidange intégrale & Révision 30 points',
     price: '20 000 FCFA',

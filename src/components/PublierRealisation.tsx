@@ -18,6 +18,7 @@ import {
 import { saveMediaBlob, getMediaBlob } from '../services/indexedDbService.ts';
 import { useApp } from '../context/AppContext.tsx';
 import { compressImageToDataUrl } from '../utils/imageCompression.ts';
+import { createSupabasePost } from '../services/supabase.ts';
 
 export interface PublierRealisationProps {
   isOpen: boolean;
@@ -30,7 +31,7 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
   onClose,
   onPublished,
 }) => {
-  const { currentUser, currentArtisan, showToast } = useApp();
+  const { currentUser, currentArtisan, showToast, createSocialPost } = useApp();
 
   // Média et contenu du formulaire
   const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo');
@@ -188,13 +189,13 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
     const finalDesc = (descTextarea ? descTextarea.value : '') || description || 'Réalisation artisanale';
 
     const postId = Date.now();
-    const authorName = currentUser?.name || currentArtisan?.name || 'Vous';
+    const authorName = currentUser?.name || currentArtisan?.name || 'Artisan';
     const authorAvatar = currentUser?.avatarUrl || currentUser?.photoUrl || currentArtisan?.avatarUrl || currentArtisan?.photoUrl || '';
     const authorTrade = currentArtisan?.trade || (currentUser?.role === 'artisan' ? 'Artisan Pro' : 'Créateur');
     const authorCity = currentArtisan?.city || currentUser?.city || 'Abidjan';
     const authorCountry = currentArtisan?.country || currentUser?.country || 'Côte d’Ivoire';
-    const authorId = currentUser?.id ? String(currentUser.id) : 'artisan_local';
-    const artisanNumId = currentArtisan?.id || currentUser?.artisanId || 1;
+    const authorId = currentUser?.id ? String(currentUser.id) : (currentArtisan ? String(currentArtisan.id) : undefined);
+    const artisanNumId = currentArtisan?.id || currentUser?.artisanId || undefined;
 
     // Cas Vidéo : enregistrement IndexedDB + miniature légère dans le tableau
     if (mediaType === 'video') {
@@ -220,6 +221,27 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
       await saveMediaBlob(`video_${postId}`, videoBlob);
       if (thumbBlob) {
         await saveMediaBlob(`thumb_${postId}`, thumbBlob);
+      }
+
+      // Synchronisation Supabase (user_id, content, image_url, created_at)
+      await createSupabasePost(finalDesc, thumbUrl);
+      if (createSocialPost) {
+        await createSocialPost({
+          author: authorName,
+          role: 'ARTISAN',
+          artisanId: artisanNumId,
+          artisanName: authorName,
+          artisanTrade: authorTrade,
+          artisanAvatar: authorAvatar,
+          artisanEmoji: '🛠️',
+          verified: true,
+          city: authorCity,
+          country: authorCountry,
+          content: finalDesc,
+          mediaType: 'video',
+          mediaUrl: thumbUrl,
+          price: finalTarif,
+        });
       }
 
       const newPost = {
@@ -301,6 +323,27 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
         type: 'warning',
       });
       return;
+    }
+
+    // Enregistrement Supabase respectant strictement : id, user_id (uuid), content, image_url, created_at
+    await createSupabasePost(finalDesc, photoData);
+    if (createSocialPost) {
+      await createSocialPost({
+        author: authorName,
+        role: 'ARTISAN',
+        artisanId: artisanNumId,
+        artisanName: authorName,
+        artisanTrade: authorTrade,
+        artisanAvatar: authorAvatar,
+        artisanEmoji: '🛠️',
+        verified: true,
+        city: authorCity,
+        country: authorCountry,
+        content: finalDesc,
+        mediaType: 'photo',
+        mediaUrl: photoData,
+        price: finalTarif,
+      });
     }
 
     const newPhotoPost = {

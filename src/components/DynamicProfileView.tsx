@@ -493,13 +493,19 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
               {/* Photo Pro */}
               <div className="relative">
-                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl overflow-hidden bg-neutral-800 border-2 border-neutral-700 shadow-xl">
-                  <img
-                    src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&auto=format&fit=crop&q=80"
-                    alt="Yao Kouassi"
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
+                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl overflow-hidden bg-neutral-800 border-2 border-neutral-700 shadow-xl flex items-center justify-center">
+                  {currentUser?.avatarUrl || currentArtisan?.avatarUrl ? (
+                    <img
+                      src={currentUser?.avatarUrl || currentArtisan?.avatarUrl}
+                      alt={currentUser?.name || currentArtisan?.name || 'Profil'}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-linear-to-br from-amber-600 to-[#FF6B00] text-white flex items-center justify-center text-3xl font-black">
+                      {(currentUser?.name || currentArtisan?.name || 'AP').slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 <div className="absolute -bottom-2 -right-2 px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-md flex items-center gap-1 border border-neutral-900">
                   <Check className="w-3 h-3" />
@@ -516,29 +522,53 @@ export const DynamicProfileView: React.FC<DynamicProfileViewProps> = ({
                   {/* Note 4.8/5 */}
                   <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-neutral-800 text-amber-400 text-xs font-bold border border-neutral-700">
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <span>4.8 / 5</span>
-                    <span className="text-neutral-500 font-normal">(38 avis)</span>
+                    <span>{currentArtisan?.rating ? `${currentArtisan.rating} / 5` : '5.0 / 5'}</span>
+                    <span className="text-neutral-500 font-normal">({currentArtisan?.reviewsCount || 12} avis)</span>
                   </div>
                 </div>
 
                 <h2 className="text-2xl sm:text-3xl font-black text-white">
-                  Yao Kouassi
+                  {currentUser?.name || currentArtisan?.name || 'Artisan Pro'}
                 </h2>
                 <p className="text-sm font-bold text-amber-500">
-                  Couturier & Styliste Traditionnel
+                  {currentArtisan?.trade || currentUser?.trade || 'Artisan Professionnel'}
                 </p>
 
-                {/* Localisation : Abidjan Marcory Zone 4 */}
-                <p className="text-xs text-neutral-400 flex items-center justify-center sm:justify-start gap-1.5 font-medium">
-                  <MapPin className="w-4 h-4 text-red-400" />
-                  <span>Abidjan Marcory Zone 4</span>
-                </p>
+                {/* Localisation */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1">
+                  <p className="text-xs text-neutral-400 flex items-center gap-1.5 font-medium">
+                    <MapPin className="w-4 h-4 text-red-400" />
+                    <span>
+                      {currentArtisan?.city || currentUser?.city || 'Abidjan'}, {currentArtisan?.country || currentUser?.country || 'Côte d’Ivoire'}
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const lat = currentArtisan?.lat || (currentUser as any)?.latitude;
+                      const lng = currentArtisan?.lng || (currentUser as any)?.longitude;
+                      const city = currentArtisan?.city || currentUser?.city || 'Abidjan';
+                      const country = currentArtisan?.country || currentUser?.country || 'Côte d’Ivoire';
+                      let mapUrl = '';
+                      if (typeof lat === 'number' && typeof lng === 'number' && lat !== 0 && lng !== 0) {
+                        mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+                      } else {
+                        mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${city}, ${country}`)}`;
+                      }
+                      window.open(mapUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="px-3 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-[#FF6B00] text-[11px] font-black border border-neutral-700 flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                    title="Ouvrir l'itinéraire GPS pour rejoindre l'artisan"
+                  >
+                    <span>📍 VOIR LA LOCALISATION</span>
+                  </button>
+                </div>
 
                 {/* Bio simple */}
                 <p className="text-xs text-neutral-300 max-w-xl leading-relaxed pt-1">
-                  Spécialiste de la confection sur-mesure de tenues traditionnelles,
-                  boubous d’apparat et chemises modernes. Finitions soignées et livraisons
-                  express partout à Abidjan depuis plus de 12 ans.
+                  {currentArtisan?.description ||
+                    currentUser?.bio ||
+                    'Artisan qualifié certifié sur ArtisanPro Afrique. Prestations soignées, devis personnalisés et interventions rapides.'}
                 </p>
 
                 {/* Disponibilité : En ligne / Hors ligne */}
