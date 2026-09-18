@@ -339,8 +339,21 @@ export const INITIAL_CLIENTS: User[] = [
     joinedDate: '2024-03-12',
   },
   {
-    id: 'user-admin-principal',
-    name: 'Admin Principal ArtisanPro Africa',
+    id: 'user-admin-dg',
+    name: 'DG DIRECTEUR GÉNÉRAL PRINCIPAL',
+    email: 'artisanproafrique@gmail.com',
+    role: 'super_admin',
+    phone: '+225 0503444508',
+    whatsapp: '+2250503444508',
+    city: 'Abidjan',
+    country: 'Côte d’Ivoire',
+    joinedDate: '2023-10-01',
+    bio: 'Direction Générale et Supervision de la plateforme ArtisanPro Africa (Patron Suprême).',
+    secretCodeHash: '96cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e', // 'admin'
+  },
+  {
+    id: 'user-admin-support',
+    name: 'SUPPORT TECHNIQUE & CLIENT',
     email: 'contactartisanproafrica@gmail.com',
     role: 'super_admin',
     phone: '+225 0503444508',
@@ -348,12 +361,12 @@ export const INITIAL_CLIENTS: User[] = [
     city: 'Abidjan',
     country: 'Côte d’Ivoire',
     joinedDate: '2023-10-01',
-    bio: 'Direction Générale et Supervision de la plateforme ArtisanPro Africa (Admin Principal).',
+    bio: 'Support Technique et Assistance Clients & Retraits ArtisanPro Africa.',
     secretCodeHash: '96cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e', // 'admin'
   },
   {
     id: 'user-admin-adan',
-    name: 'Adan Mitonde (Admin Secondaire)',
+    name: 'ADANMITONDE GERAUD (Créateur Secours)',
     email: 'adanmitondejunior07@gmail.com',
     role: 'super_admin',
     phone: '+225 0503444508',
@@ -361,30 +374,19 @@ export const INITIAL_CLIENTS: User[] = [
     city: 'Abidjan',
     country: 'Côte d’Ivoire',
     joinedDate: '2023-10-01',
-    bio: 'Super Administrateur Secondaire avec droits complets de gestion de la plateforme.',
+    bio: 'Créateur / Contrôle Total Secours - Super Administrateur.',
     secretCodeHash: '96cae35ce8a9b0244178bf28e4966c2ce1b8385723a96a6b838858cdd6ca0a1e', // 'admin'
-  },
-  {
-    id: 'user-admin-afrique',
-    name: 'Support Technique Central',
-    email: 'admin@artisanpro.afrique',
-    role: 'super_admin',
-    phone: '+225 0503444508',
-    whatsapp: '+2250503444508',
-    city: 'Abidjan',
-    country: 'Côte d’Ivoire',
-    joinedDate: '2023-10-01',
   },
 ];
 
 /**
- * Table admins avec rôle super_admin pour contactartisanproafrica@gmail.com et adanmitondejunior07@gmail.com
+ * Table admins avec les 3 super admins officiels distincts
  */
 export const INITIAL_ADMINS = [
   {
-    id: 'admin-principal-1',
-    name: 'Admin Principal (Direction Générale)',
-    email: 'contactartisanproafrica@gmail.com',
+    id: 'admin-dg-1',
+    name: 'DG DIRECTEUR GÉNÉRAL PRINCIPAL',
+    email: 'artisanproafrique@gmail.com',
     role: 'super_admin' as const,
     isPrimary: true,
     phone: '+225 0503444508',
@@ -395,8 +397,21 @@ export const INITIAL_ADMINS = [
     permissions: ['dashboard', 'users', 'orders', 'delete', 'block', 'finances'],
   },
   {
-    id: 'admin-secondaire-2',
-    name: 'Adan Mitonde (Admin Secondaire)',
+    id: 'admin-support-2',
+    name: 'SUPPORT TECHNIQUE & CLIENT',
+    email: 'contactartisanproafrica@gmail.com',
+    role: 'super_admin' as const,
+    isPrimary: false,
+    phone: '+225 0503444508',
+    whatsapp: '+2250503444508',
+    city: 'Abidjan',
+    country: 'Côte d’Ivoire',
+    joinedDate: '2023-10-01',
+    permissions: ['dashboard', 'users', 'orders', 'retraits'],
+  },
+  {
+    id: 'admin-createur-3',
+    name: 'ADANMITONDE GERAUD (Créateur Secours)',
     email: 'adanmitondejunior07@gmail.com',
     role: 'super_admin' as const,
     isPrimary: false,

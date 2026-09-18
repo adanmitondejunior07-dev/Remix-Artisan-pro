@@ -23,6 +23,7 @@ export const SocialFeed: React.FC = () => {
     go,
     isSubscriptionExpired,
     setSelectedArtisanId,
+    viewProfile,
     t: tApp,
   } = useApp();
 
@@ -77,22 +78,14 @@ export const SocialFeed: React.FC = () => {
   };
 
   const handleAuthorClick = (post: SocialPost) => {
-    if (post.artisanId) {
-      setSelectedArtisanId(post.artisanId);
-      go('profile');
-    } else {
-      const match = artisans.find(
-        (a) =>
-          a.name.trim().toLowerCase() ===
-          (post.author || post.artisanName || '').trim().toLowerCase()
-      );
-      if (match) {
-        setSelectedArtisanId(match.id);
-        go('profile');
-      } else {
-        go('profile');
-      }
-    }
+    viewProfile({
+      artisanId: post.artisanId,
+      userId: post.userId,
+      author: post.author || post.artisanName || post.user,
+      artisanName: post.artisanName,
+      name: post.author || post.artisanName || post.user,
+      avatarUrl: post.artisanAvatar || (post as any).avatar,
+    });
   };
 
   return (
@@ -204,8 +197,7 @@ export const SocialFeed: React.FC = () => {
             <div
               key={art.id}
               onClick={() => {
-                setSelectedArtisanId(art.id);
-                go('profile');
+                viewProfile({ artisan: art, artisanId: art.id });
               }}
               className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group"
             >

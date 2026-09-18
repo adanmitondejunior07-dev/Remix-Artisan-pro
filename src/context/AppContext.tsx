@@ -91,6 +91,28 @@ interface AppContextType {
   selectedArtisanId: number | null;
   setSelectedArtisanId: (id: number | null) => void;
   selectedArtisan: Artisan | null;
+  selectedUserId: string | null;
+  setSelectedUserId: (id: string | null) => void;
+  selectedUser: User | null;
+  setSelectedUser: (user: User | null) => void;
+  viewProfile: (
+    target?: {
+      artisanId?: number;
+      userId?: string;
+      user?: User;
+      artisan?: Artisan;
+      name?: string;
+      email?: string;
+      phone?: string;
+      whatsapp?: string;
+      author?: string;
+      artisanName?: string;
+      avatarUrl?: string;
+      trade?: string;
+      city?: string;
+      country?: string;
+    } | null
+  ) => void;
   notifications: AppNotification[];
   unreadNotifsCount: number;
   markNotifAsRead: (id: string) => Promise<void>;
@@ -259,6 +281,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [currentArtisan, setCurrentArtisan] = useState<Artisan | null>(null);
   const [selectedArtisanId, setSelectedArtisanId] = useState<number | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -859,6 +883,9 @@ function loadLocalArtisanPosts(): SocialPost[] {
         : user;
 
       setCurrentUser(effectiveUser);
+      setSelectedArtisanId(null);
+      setSelectedUserId(null);
+      setSelectedUser(null);
       if (typeof window !== 'undefined') {
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('email', effectiveUser.email || '');
@@ -2001,6 +2028,151 @@ function loadLocalArtisanPosts(): SocialPost[] {
     ? artisans.find((a) => a.id === selectedArtisanId) || null
     : null;
 
+  const viewProfile = useCallback(
+    (
+      target?: {
+        artisanId?: number;
+        userId?: string;
+        user?: User;
+        artisan?: Artisan;
+        name?: string;
+        email?: string;
+        phone?: string;
+        whatsapp?: string;
+        author?: string;
+        artisanName?: string;
+        avatarUrl?: string;
+        trade?: string;
+        city?: string;
+        country?: string;
+      } | null
+    ) => {
+      // If null or undefined -> View own profile
+      if (!target) {
+        setSelectedArtisanId(null);
+        setSelectedUserId(null);
+        setSelectedUser(null);
+        setPage('profile');
+        return;
+      }
+
+      // Check if this target is actually the current user
+      const isTargetCurrentUser = Boolean(
+        currentUser && (
+          (target.userId && String(target.userId) === String(currentUser.id)) ||
+          (target.email && currentUser.email && target.email.trim().toLowerCase() === currentUser.email.trim().toLowerCase()) ||
+          (target.name && currentUser.name && target.name.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+          (target.author && currentUser.name && target.author.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+          (target.artisanName && currentUser.name && target.artisanName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+          (target.artisanId && currentUser.artisanId === target.artisanId)
+        )
+      );
+
+      if (isTargetCurrentUser) {
+        setSelectedArtisanId(null);
+        setSelectedUserId(null);
+        setSelectedUser(null);
+        setPage('profile');
+        return;
+      }
+
+      // 1. Direct artisan passed
+      if (target.artisan) {
+        setSelectedArtisanId(target.artisan.id);
+        setSelectedUserId(null);
+        setSelectedUser(null);
+        setPage('profile');
+        return;
+      }
+
+      // 2. Direct artisanId is valid
+      if (target.artisanId) {
+        const foundArtisan = artisans.find((a) => a.id === target.artisanId);
+        if (foundArtisan) {
+          setSelectedArtisanId(foundArtisan.id);
+          setSelectedUserId(null);
+          setSelectedUser(null);
+          setPage('profile');
+          return;
+        }
+      }
+
+      // 3. Direct user passed
+      if (target.user) {
+        setSelectedUser(target.user);
+        setSelectedUserId(target.user.id);
+        setSelectedArtisanId(target.user.artisanId || null);
+        setPage('profile');
+        return;
+      }
+
+      // 4. Search in artisans by name / author / email
+      const targetName = (target.author || target.artisanName || target.name || '').trim();
+      const targetEmail = (target.email || '').trim().toLowerCase();
+
+      if (targetName || targetEmail) {
+        const matchedArtisan = artisans.find(
+          (a) =>
+            (targetEmail && a.email && a.email.trim().toLowerCase() === targetEmail) ||
+            (targetName && a.name.trim().toLowerCase() === targetName.toLowerCase())
+        );
+        if (matchedArtisan) {
+          setSelectedArtisanId(matchedArtisan.id);
+          setSelectedUserId(null);
+          setSelectedUser(null);
+          setPage('profile');
+          return;
+        }
+      }
+
+      // 5. Search in users collection
+      const targetUserId = target.userId ? String(target.userId) : '';
+      const matchedUser = users.find(
+        (u) =>
+          (targetUserId && String(u.id) === targetUserId) ||
+          (targetEmail && u.email && u.email.trim().toLowerCase() === targetEmail) ||
+          (targetName && u.name.trim().toLowerCase() === targetName.toLowerCase())
+      );
+
+      if (matchedUser) {
+        setSelectedUser(matchedUser);
+        setSelectedUserId(matchedUser.id);
+        setSelectedArtisanId(matchedUser.artisanId || null);
+        setPage('profile');
+        return;
+      }
+
+      // 6. If author is not yet in users or artisans list, build guest/author profile with exact name and avatar
+      if (targetName || targetUserId) {
+        const ephemeralUser: User = {
+          id: targetUserId || `guest_${Date.now()}`,
+          name: targetName || 'Membre ArtisanPro',
+          email: target.email || '',
+          phone: target.phone || '',
+          whatsapp: target.whatsapp || '',
+          role: target.artisanId ? 'artisan' : 'client',
+          city: target.city || 'Abidjan',
+          country: target.country || 'Côte d’Ivoire',
+          avatarUrl: target.avatarUrl || '',
+          bio: `${targetName || 'Ce membre'} est un utilisateur actif sur ArtisanPro Africa.`,
+          trade: target.trade,
+        };
+        setSelectedUser(ephemeralUser);
+        setSelectedUserId(ephemeralUser.id);
+        setSelectedArtisanId(null);
+        setPage('profile');
+        return;
+      }
+
+      // Default fallback: view own profile
+      setSelectedArtisanId(null);
+      setSelectedUserId(null);
+      setSelectedUser(null);
+      setPage('profile');
+    },
+    [artisans, users, currentUser]
+  );
+
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
   return (
@@ -2016,6 +2188,11 @@ function loadLocalArtisanPosts(): SocialPost[] {
         selectedArtisanId,
         setSelectedArtisanId,
         selectedArtisan,
+        selectedUserId,
+        setSelectedUserId,
+        selectedUser,
+        setSelectedUser,
+        viewProfile,
         notifications,
         unreadNotifsCount,
         markNotifAsRead,

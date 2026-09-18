@@ -36,6 +36,7 @@ import {
   AlertTriangle,
   Loader2,
   Pencil,
+  Mail,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { isSuperAdmin } from '../config/adminConfig.ts';
@@ -57,6 +58,7 @@ import { PublierRealisation } from './PublierRealisation.tsx';
 export const ProfilePage: React.FC = () => {
   const {
     selectedArtisan,
+    selectedUser,
     go,
     quoteModal,
     startChatWithArtisan,
@@ -75,12 +77,13 @@ export const ProfilePage: React.FC = () => {
     refreshData,
   } = useApp();
 
-  // 1. Détermination du profil cible (Artisan sélectionné OU utilisateur actuel)
-  const isTargetingArtisan = Boolean(selectedArtisan);
-
-  // Vérifier si l'utilisateur consulte son propre profil
+  // 1. Détermination du profil cible (Profil personnel vs Visite d'un autre profil)
   const isOwnProfile = Boolean(
-    !selectedArtisan ||
+    (!selectedArtisan && !selectedUser) ||
+    (currentUser && selectedUser && (
+      String(currentUser.id) === String(selectedUser.id) ||
+      (currentUser.email && selectedUser.email && currentUser.email.trim().toLowerCase() === selectedUser.email.trim().toLowerCase())
+    )) ||
     (currentUser && selectedArtisan && (
       String(currentUser.id) === String(selectedArtisan.id) ||
       (currentUser as any).uid === String(selectedArtisan.id) ||
@@ -89,47 +92,70 @@ export const ProfilePage: React.FC = () => {
     (currentArtisan && selectedArtisan && currentArtisan.id === selectedArtisan.id)
   );
 
+  const isTargetingArtisan = Boolean(
+    (!isOwnProfile && selectedArtisan) ||
+    (isOwnProfile && (currentUser?.role === 'artisan' || currentArtisan))
+  );
+
   // Informations effectives du profil affiché
-  const targetName = isTargetingArtisan
-    ? selectedArtisan!.name
-    : currentUser?.name || currentArtisan?.name || 'Mon Profil';
+  const targetName = isOwnProfile
+    ? (currentUser?.name || currentArtisan?.name || 'Mon Profil')
+    : (selectedArtisan?.name || selectedUser?.name || 'Profil Membre');
 
-  const targetTrade = isTargetingArtisan
-    ? selectedArtisan!.trade
-    : currentArtisan?.trade || (currentUser?.role === 'artisan' ? 'Artisan Professionnel' : 'Membre Particulier');
+  // EMAIL DU PROFIL (DEMANDE EXPLICITE DE L'UTILISATEUR)
+  const targetEmail = isOwnProfile
+    ? (currentUser?.email || currentArtisan?.email || '')
+    : (selectedArtisan?.email || selectedUser?.email || '');
 
-  const targetCity = isTargetingArtisan
-    ? selectedArtisan!.city
-    : currentArtisan?.city || currentUser?.city || 'Abidjan';
+  const targetTrade = isOwnProfile
+    ? (currentArtisan?.trade || (currentUser?.role === 'artisan' ? 'Artisan Professionnel' : 'Membre Particulier'))
+    : (selectedArtisan?.trade || (selectedUser?.role === 'artisan' ? 'Artisan Professionnel' : 'Membre Particulier'));
 
-  const targetCountry = isTargetingArtisan
-    ? selectedArtisan!.country
-    : currentArtisan?.country || currentUser?.country || 'Côte d’Ivoire';
+  const targetCity = isOwnProfile
+    ? (currentUser?.city || currentArtisan?.city || 'Abidjan')
+    : (selectedArtisan?.city || selectedUser?.city || 'Abidjan');
+
+  const targetCountry = isOwnProfile
+    ? (currentUser?.country || currentArtisan?.country || 'Côte d’Ivoire')
+    : (selectedArtisan?.country || selectedUser?.country || 'Côte d’Ivoire');
 
   // RÈGLE ABSOLUE 2: Badge ArtisanPro UNIQUEMENT si réellement vérifié dans la base de données
   const isActuallyVerified = Boolean(
-    isTargetingArtisan
-      ? selectedArtisan!.verified || (selectedArtisan as any)!.is_verified
-      : currentUser?.verified || (currentUser as any)?.is_verified || currentArtisan?.verified || (currentArtisan as any)?.is_verified
+    isOwnProfile
+      ? (currentUser?.verified || (currentUser as any)?.is_verified || currentArtisan?.verified || (currentArtisan as any)?.is_verified)
+      : (selectedArtisan?.verified || (selectedArtisan as any)?.is_verified || selectedUser?.verified || (selectedUser as any)?.is_verified)
   );
 
-  const targetBio = isTargetingArtisan
-    ? selectedArtisan!.description || `${selectedArtisan!.name} est un professionnel qualifié à ${selectedArtisan!.city}. Contactez-le pour vos travaux et réalisations.`
-    : (currentUser as any)?.bio || currentArtisan?.description || 'Bienvenue sur mon profil ArtisanPro.';
+  const targetBio = isOwnProfile
+    ? ((currentUser as any)?.bio || currentArtisan?.description || 'Bienvenue sur mon profil ArtisanPro.')
+    : (selectedArtisan?.description || selectedUser?.bio || `${targetName} est un membre actif sur la plateforme ArtisanPro Africa.`);
 
-  const targetAvatar = isTargetingArtisan
-    ? selectedArtisan!.avatarUrl || (selectedArtisan as any)!.photoUrl
-    : currentUser?.avatarUrl || currentArtisan?.avatarUrl;
+  const targetAvatar = isOwnProfile
+    ? (currentUser?.avatarUrl || currentArtisan?.avatarUrl)
+    : (selectedArtisan?.avatarUrl || (selectedArtisan as any)?.photoUrl || selectedUser?.avatarUrl);
 
-  const targetEmoji = isTargetingArtisan ? selectedArtisan!.emoji : '👤';
+  const targetEmoji = isTargetingArtisan ? (selectedArtisan?.emoji || currentArtisan?.emoji || '👤') : '👤';
 
-  const defaultBanner = isTargetingArtisan ? getArtisanBanner(selectedArtisan!) : PROFILE_BANNER_PRESETS[0].url;
-  const targetCover = (isTargetingArtisan ? selectedArtisan!.bannerUrl || selectedArtisan!.coverUrl : currentUser?.bannerUrl || currentArtisan?.bannerUrl) || defaultBanner;
+  const defaultBanner = (isTargetingArtisan && selectedArtisan) ? getArtisanBanner(selectedArtisan) : PROFILE_BANNER_PRESETS[0].url;
+  const targetCover = (isOwnProfile
+    ? (currentUser?.bannerUrl || currentArtisan?.bannerUrl)
+    : (selectedArtisan?.bannerUrl || selectedArtisan?.coverUrl || selectedUser?.bannerUrl)) || defaultBanner;
 
-  const targetPhone = isTargetingArtisan ? selectedArtisan!.phone : currentUser?.phone || currentArtisan?.phone || '';
-  const targetWhatsapp = isTargetingArtisan ? selectedArtisan!.whatsapp || selectedArtisan!.phone : currentUser?.whatsapp || currentArtisan?.whatsapp || targetPhone;
-  const targetFacebook = isTargetingArtisan ? selectedArtisan!.facebook : currentUser?.facebook || currentArtisan?.facebook || '';
-  const targetTiktok = isTargetingArtisan ? selectedArtisan!.tiktok : currentUser?.tiktok || currentArtisan?.tiktok || '';
+  const targetPhone = isOwnProfile
+    ? (currentUser?.phone || currentArtisan?.phone || '')
+    : (selectedArtisan?.phone || selectedUser?.phone || '');
+
+  const targetWhatsapp = isOwnProfile
+    ? (currentUser?.whatsapp || currentArtisan?.whatsapp || targetPhone)
+    : (selectedArtisan?.whatsapp || selectedArtisan?.phone || selectedUser?.whatsapp || targetPhone);
+
+  const targetFacebook = isOwnProfile
+    ? (currentUser?.facebook || currentArtisan?.facebook || '')
+    : (selectedArtisan?.facebook || selectedUser?.facebook || '');
+
+  const targetTiktok = isOwnProfile
+    ? (currentUser?.tiktok || currentArtisan?.tiktok || '')
+    : (selectedArtisan?.tiktok || selectedUser?.tiktok || '');
 
   // Liens sociaux
   const whatsappUrl = formatWhatsAppUrl(targetWhatsapp);
@@ -139,24 +165,34 @@ export const ProfilePage: React.FC = () => {
   // Publications de ce profil (Règle 3 & 6)
   const userPosts = useMemo(() => {
     return socialPosts.filter((p) => {
-      if (isTargetingArtisan) {
+      if (isOwnProfile) {
+        if (!currentUser) return false;
         return (
-          p.artisanId === selectedArtisan!.id ||
-          (p.userId && String(p.userId) === String(selectedArtisan!.id)) ||
+          (p.userId && String(p.userId) === String(currentUser.id)) ||
+          (currentArtisan?.id && p.artisanId === currentArtisan.id) ||
+          (p.author && currentUser.name && p.author.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+          (p.artisanName && currentUser.name && p.artisanName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+        );
+      }
+      if (selectedArtisan) {
+        return (
+          p.artisanId === selectedArtisan.id ||
+          (p.userId && String(p.userId) === String(selectedArtisan.id)) ||
           (p.author && p.author.trim().toLowerCase() === targetName.trim().toLowerCase()) ||
           (p.artisanName && p.artisanName.trim().toLowerCase() === targetName.trim().toLowerCase())
         );
       }
-      if (currentUser?.id) {
+      if (selectedUser) {
         return (
-          p.userId === String(currentUser.id) ||
-          (currentArtisan?.id && p.artisanId === currentArtisan.id) ||
-          (p.author && p.author.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase())
+          (p.userId && String(p.userId) === String(selectedUser.id)) ||
+          (selectedUser.artisanId && p.artisanId === selectedUser.artisanId) ||
+          (p.author && p.author.trim().toLowerCase() === targetName.trim().toLowerCase()) ||
+          (p.artisanName && p.artisanName.trim().toLowerCase() === targetName.trim().toLowerCase())
         );
       }
       return false;
     });
-  }, [socialPosts, isTargetingArtisan, selectedArtisan, currentUser, currentArtisan, targetName]);
+  }, [socialPosts, isOwnProfile, selectedArtisan, selectedUser, currentUser, currentArtisan, targetName]);
 
   // Photos de ce profil
   const userPhotos = useMemo(() => {
@@ -194,6 +230,7 @@ export const ProfilePage: React.FC = () => {
 
   // États pour la modification du profil
   const [editName, setEditName] = useState(targetName);
+  const [editEmail, setEditEmail] = useState(targetEmail);
   const [editTrade, setEditTrade] = useState(targetTrade);
   const [editCity, setEditCity] = useState(targetCity);
   const [editCountry, setEditCountry] = useState(targetCountry);
@@ -209,19 +246,26 @@ export const ProfilePage: React.FC = () => {
   const [quickNameInput, setQuickNameInput] = useState(targetName);
 
   useEffect(() => {
-    setQuickNameInput(targetName);
-    setEditName(targetName);
-  }, [targetName]);
+    setQuickNameInput(isOwnProfile ? (currentUser?.name || currentArtisan?.name || targetName) : targetName);
+    setEditName(isOwnProfile ? (currentUser?.name || currentArtisan?.name || targetName) : targetName);
+    setEditEmail(isOwnProfile ? (currentUser?.email || targetEmail) : targetEmail);
+    setEditTrade(isOwnProfile ? (currentUser?.trade || currentArtisan?.trade || targetTrade) : targetTrade);
+    setEditCity(isOwnProfile ? (currentUser?.city || currentArtisan?.city || targetCity) : targetCity);
+    setEditCountry(isOwnProfile ? (currentUser?.country || currentArtisan?.country || targetCountry) : targetCountry);
+    setEditBio(isOwnProfile ? ((currentUser as any)?.bio || currentArtisan?.description || targetBio) : targetBio);
+    setEditPhone(isOwnProfile ? (currentUser?.phone || currentArtisan?.phone || targetPhone) : targetPhone);
+    setEditWhatsapp(isOwnProfile ? (currentUser?.whatsapp || currentArtisan?.whatsapp || targetWhatsapp) : targetWhatsapp);
+    setEditFacebook(isOwnProfile ? (currentUser?.facebook || currentArtisan?.facebook || targetFacebook) : targetFacebook);
+    setEditTiktok(isOwnProfile ? (currentUser?.tiktok || currentArtisan?.tiktok || targetTiktok) : targetTiktok);
+  }, [isOwnProfile, currentUser, currentArtisan, targetName, targetEmail, targetTrade, targetCity, targetCountry, targetBio, targetPhone, targetWhatsapp, targetFacebook, targetTiktok]);
 
   const handleQuickSaveName = async (e?: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
     const newName = quickNameInput.trim();
     if (!newName) return;
-    if (selectedArtisan) {
-      selectedArtisan.name = newName;
-    }
     setEditName(newName);
     setIsQuickEditingName(false);
+    // Isoler la modification strictement au compte de l'utilisateur connecté
     await updateProfileName(newName);
   };
 
@@ -336,7 +380,7 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault();
     setIsSavingProfile(true);
     try {
-      if (selectedArtisan && canEdit) {
+      if (!isOwnProfile && selectedArtisan && canEdit) {
         await api.updateArtisan(selectedArtisan.id, {
           name: editName.trim(),
           trade: editTrade.trim(),
@@ -359,7 +403,7 @@ export const ProfilePage: React.FC = () => {
         selectedArtisan.tiktok = editTiktok.trim();
       }
 
-      if (currentUser) {
+      if (isOwnProfile && currentUser) {
         await updateUserProfile(
           {
             name: editName.trim(),
@@ -372,17 +416,19 @@ export const ProfilePage: React.FC = () => {
             trade: editTrade.trim(),
             bio: editBio.trim(),
           },
-          {
-            name: editName.trim(),
-            trade: editTrade.trim(),
-            city: editCity.trim(),
-            country: editCountry.trim(),
-            description: editBio.trim(),
-            phone: editPhone.trim(),
-            whatsapp: editWhatsapp.trim(),
-            facebook: editFacebook.trim(),
-            tiktok: editTiktok.trim(),
-          }
+          (currentUser.role === 'artisan' || currentArtisan)
+            ? {
+                name: editName.trim(),
+                trade: editTrade.trim(),
+                city: editCity.trim(),
+                country: editCountry.trim(),
+                description: editBio.trim(),
+                phone: editPhone.trim(),
+                whatsapp: editWhatsapp.trim(),
+                facebook: editFacebook.trim(),
+                tiktok: editTiktok.trim(),
+              }
+            : undefined
         );
       }
 
@@ -831,13 +877,22 @@ export const ProfilePage: React.FC = () => {
                 )}
               </div>
 
-              <p className="text-xs sm:text-sm font-semibold text-neutral-700">
+              <p className="text-xs sm:text-sm font-semibold text-neutral-700 flex items-center flex-wrap gap-y-1">
                 <span className="text-[#FF6B00] font-bold">{targetTrade}</span>
                 <span className="text-neutral-400 mx-1.5">•</span>
                 <span className="inline-flex items-center gap-1 text-neutral-600">
                   <MapPin className="w-3.5 h-3.5 text-neutral-500" />
                   <span>{targetCity}, {targetCountry}</span>
                 </span>
+                {targetEmail && (
+                  <>
+                    <span className="text-neutral-400 mx-1.5">•</span>
+                    <span className="inline-flex items-center gap-1 text-neutral-600 font-medium">
+                      <Mail className="w-3.5 h-3.5 text-neutral-400" />
+                      <span className="font-mono text-[11px] sm:text-xs text-neutral-700">{targetEmail}</span>
+                    </span>
+                  </>
+                )}
                 {distance !== null && (
                   <>
                     <span className="text-neutral-400 mx-1.5">•</span>
@@ -1052,6 +1107,23 @@ export const ProfilePage: React.FC = () => {
                   Coordonnées & Réseaux Sociaux
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {targetEmail && (
+                    <div className="p-3 rounded-xl bg-orange-50/60 border border-orange-100 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-[#FF6B00] shrink-0">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-[#FF6B00] font-bold block">Email du profil</span>
+                        <a
+                          href={`mailto:${targetEmail}`}
+                          className="font-bold text-neutral-900 font-mono truncate block hover:text-[#FF6B00] hover:underline"
+                        >
+                          {targetEmail}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
                   {targetPhone && (
                     <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-100 flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-neutral-200 flex items-center justify-center text-neutral-700 shrink-0">
@@ -1455,6 +1527,16 @@ export const ProfilePage: React.FC = () => {
                   className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
                 />
               </div>
+
+              {targetEmail && (
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Adresse Email du compte</label>
+                  <div className="w-full px-3 py-2 rounded-xl bg-neutral-100 border border-neutral-200 text-neutral-600 font-mono text-xs flex items-center gap-2 select-all">
+                    <Mail className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                    <span className="truncate">{targetEmail}</span>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block font-bold text-neutral-700 mb-1">Métier / Spécialité</label>

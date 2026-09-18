@@ -45,7 +45,7 @@ import {
 import { useApp } from '../context/AppContext.tsx';
 import { api } from '../services/api.ts';
 import type { AdminStats, PaymentTransaction, Artisan, User, WithdrawalRequest } from '../types.ts';
-import { isSuperAdmin, isFounderSuperAdmin, admins, getDashboard, getAdminAfricaProfile } from '../config/adminConfig.ts';
+import { isSuperAdmin, isFounderSuperAdmin, admins, getDashboard, getAdminAfricaProfile, getAdminUserByEmail } from '../config/adminConfig.ts';
 import { AdminPrivateAccount, ADMIN_EMAILS } from './AdminPrivateAccount.tsx';
 import { AdminSubscriptionsSection } from './AdminSubscriptionsSection.tsx';
 import { AdminMonetizationSection } from './AdminMonetizationSection.tsx';
@@ -114,6 +114,7 @@ const FounderQrCodeSvg: React.FC<{ size?: number; className?: string }> = ({ siz
 export const AdminPage: React.FC = () => {
   const {
     currentUser,
+    switchUser,
     go,
     artisans,
     users,
@@ -179,30 +180,34 @@ export const AdminPage: React.FC = () => {
   }, [currentUser?.email]);
 
   // Fonction pour basculer d'écran selon l'admin sélectionné
-  const handleSelectAdmin = (email: string) => {
+  const handleSelectAdmin = async (email: string) => {
     setSelectedAdminEmail(email);
+    const adminUser = getAdminUserByEmail(email);
+    if (switchUser) {
+      await switchUser(adminUser, false);
+    }
     const screen = getDashboard(email);
-    if (screen === 'Dashboard Retraits - A vérifier') {
+    if (screen.includes('Retraits') || screen.includes('Support Technique')) {
       setAdminTab('withdrawals');
       setWithdrawalStatusFilter('en_attente');
       showToast({
-        title: 'Dashboard Retraits - A vérifier 💰',
-        desc: 'Vue spécialisée : Validation prioritaire des retraits Mobile Money.',
+        title: `${adminUser.name} 💰`,
+        desc: `Session activée (${email}) : Support client et validation des retraits.`,
         type: 'info',
       });
-    } else if (screen === 'Dashboard Technique - CinetPay + Logs') {
+    } else if (screen.includes('Technique') || screen.includes('CinetPay') || screen.includes('Créateur')) {
       setAdminTab('technique_cinetpay');
       showToast({
-        title: 'Dashboard Technique - CinetPay + Logs ⚙️',
-        desc: 'Vue spécialisée : Passerelle CinetPay, logs et surveillance des flux.',
+        title: `${adminUser.name} ⚙️`,
+        desc: `Session activée (${email}) : Passerelle CinetPay, logs et surveillance flux.`,
         type: 'info',
       });
-    } else if (screen === 'Dashboard Direction - Tout') {
+    } else {
       setAdminTab('withdrawals');
       setWithdrawalStatusFilter('all');
       showToast({
-        title: 'Dashboard Direction - Tout 👑',
-        desc: 'Vue globale : Supervision complète de toute la plateforme.',
+        title: `${adminUser.name} 👑`,
+        desc: `Session activée (${email}) : Supervision complète de toute la plateforme.`,
         type: 'info',
       });
     }

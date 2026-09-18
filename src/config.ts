@@ -8,10 +8,11 @@ import type { AdminRecord } from './types.ts';
 export const OFFICIAL_APP_EMAIL = 'contactartisanproafrica@gmail.com';
 export const SUPPORT_EMAIL = 'contactartisanproafrica@gmail.com';
 
-// 1. Admin Principal (DG) & 2. Admin Secondaire & 3. Support Technique
+// 1. Admin Principal (DG) & 2. Admin Secondaire (Créateur) & 3. Support Technique
 export const PRIMARY_ADMIN_EMAIL = 'artisanproafrique@gmail.com';
 export const SECONDARY_ADMIN_EMAIL = 'adanmitondejunior07@gmail.com';
-export const FOUNDER_EMAIL = 'artisanproafrique@gmail.com';
+export const FOUNDER_EMAIL = 'adanmitondejunior07@gmail.com';
+export const TECH_SUPPORT_ADMIN_EMAIL = 'contactartisanproafrica@gmail.com';
 
 // Les trois super admins fondateurs officiels
 export const superAdmins: string[] = [
@@ -55,9 +56,9 @@ export const ADMIN_EMAILS: string[] = Array.from(
  */
 export const ADMINS_TABLE: AdminRecord[] = [
   {
-    id: 'admin-principal-1',
-    name: 'Admin Principal (Direction Générale)',
-    email: PRIMARY_ADMIN_EMAIL,
+    id: 'admin-dg-1',
+    name: 'DG DIRECTEUR GÉNÉRAL PRINCIPAL',
+    email: PRIMARY_ADMIN_EMAIL, // artisanproafrique@gmail.com
     role: 'super_admin',
     isPrimary: true,
     phone: '+225 0503444508',
@@ -78,9 +79,9 @@ export const ADMINS_TABLE: AdminRecord[] = [
     ],
   },
   {
-    id: 'admin-secondaire-2',
-    name: 'ADANMITONDE GERAUD',
-    email: SECONDARY_ADMIN_EMAIL,
+    id: 'admin-support-2',
+    name: 'SUPPORT TECHNIQUE & CLIENT',
+    email: OFFICIAL_APP_EMAIL, // contactartisanproafrica@gmail.com
     role: 'super_admin',
     isPrimary: false,
     phone: '+225 0503444508',
@@ -91,19 +92,15 @@ export const ADMINS_TABLE: AdminRecord[] = [
     permissions: [
       'dashboard',
       'users_view',
-      'users_delete',
-      'users_block',
       'orders_view',
-      'orders_manage',
       'withdrawals_manage',
-      'financials',
       'broadcast',
     ],
   },
   {
-    id: 'admin-fondateur-3',
-    name: 'ADANMITONDE GERAUD (Fondateur)',
-    email: FOUNDER_EMAIL,
+    id: 'admin-createur-3',
+    name: 'ADANMITONDE GERAUD (Créateur Secours)',
+    email: SECONDARY_ADMIN_EMAIL, // adanmitondejunior07@gmail.com
     role: 'super_admin',
     isPrimary: false,
     phone: '+225 0503444508',
@@ -171,22 +168,64 @@ export const SUPPORT_WHATSAPP_LINK = 'https://wa.me/2250503444508';
  */
 export function getAdminUserByEmail(email: string) {
   const normalized = email.toLowerCase().trim();
-  const isAdan = normalized === SECONDARY_ADMIN_EMAIL || normalized.includes('adan');
   const matchedAdmin = ADMINS_TABLE.find((a) => a.email.toLowerCase() === normalized);
 
+  if (normalized === 'adanmitondejunior07@gmail.com' || normalized.includes('adan')) {
+    return {
+      id: 'user-admin-adan',
+      name: matchedAdmin?.name || 'ADANMITONDE GERAUD (Créateur Secours)',
+      email: 'adanmitondejunior07@gmail.com',
+      role: 'super_admin' as const,
+      phone: '+225 0503444508',
+      whatsapp: '+2250503444508',
+      city: 'Abidjan',
+      country: 'Côte d’Ivoire',
+      joinedDate: '2023-10-01',
+      bio: 'Créateur / Contrôle Total Secours: ADANMITONDE GERAUD.',
+      adminPermissions: {
+        allowVoip: true,
+        allowScreenShare: true,
+        allowViewAllProfiles: true,
+        allowDeleteAccount: true,
+        allowTechSupportMode: true,
+      },
+    };
+  }
+
+  if (normalized === 'contactartisanproafrica@gmail.com') {
+    return {
+      id: 'user-admin-support',
+      name: matchedAdmin?.name || 'SUPPORT TECHNIQUE & CLIENT',
+      email: 'contactartisanproafrica@gmail.com',
+      role: 'super_admin' as const,
+      phone: '+225 0503444508',
+      whatsapp: '+2250503444508',
+      city: 'Abidjan',
+      country: 'Côte d’Ivoire',
+      joinedDate: '2023-10-01',
+      bio: 'Support Technique & Client ArtisanPro Africa.',
+      adminPermissions: {
+        allowVoip: true,
+        allowScreenShare: true,
+        allowViewAllProfiles: true,
+        allowDeleteAccount: false,
+        allowTechSupportMode: true,
+      },
+    };
+  }
+
+  // Default: DG Directeur Général Principal
   return {
-    id: isAdan ? 'user-admin-adan' : 'user-admin-principal',
-    name: matchedAdmin?.name || (isAdan ? 'ADANMITONDE GERAUD' : 'Admin Principal ArtisanPro'),
-    email: normalized,
+    id: 'user-admin-dg',
+    name: matchedAdmin?.name || 'DG DIRECTEUR GÉNÉRAL PRINCIPAL',
+    email: 'artisanproafrique@gmail.com',
     role: 'super_admin' as const,
     phone: '+225 0503444508',
     whatsapp: '+2250503444508',
     city: 'Abidjan',
     country: 'Côte d’Ivoire',
     joinedDate: '2023-10-01',
-    bio: isAdan
-      ? 'Fondateur: ADANMITONDE GERAUD - Super Administrateur.'
-      : 'Super Administrateur Principal - Direction Générale de la plateforme.',
+    bio: 'Direction Générale et Supervision Globale de la plateforme ArtisanPro Africa.',
     adminPermissions: {
       allowVoip: true,
       allowScreenShare: true,
