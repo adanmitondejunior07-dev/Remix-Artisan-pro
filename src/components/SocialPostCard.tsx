@@ -68,22 +68,52 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
   const [editText, setEditText] = useState(post.content || post.texte || '');
   const [editTitle, setEditTitle] = useState(post.nom || '');
 
-  // Author information
-  const authorName = post.author || post.artisanName || (post as any).artisan || 'Utilisateur';
+  // Author information: DYNAMIC LOOKUP from profiles linked to user_id (Règle user_id)
+  const isPostByUser = Boolean(
+    currentUser &&
+    ((post.userId && (String(post.userId) === String(currentUser.id) || post.userId === 'current-user')) ||
+     (currentUser.artisanId && post.artisanId === currentUser.artisanId))
+  );
+
+  const authorUser = post.userId
+    ? (isPostByUser
+        ? currentUser
+        : users.find((u) => String(u.id) === String(post.userId)))
+    : undefined;
+
+  const authorArtisan = post.artisanId
+    ? (currentArtisan && currentArtisan.id === post.artisanId
+        ? currentArtisan
+        : artisans.find((a) => a.id === post.artisanId))
+    : (authorUser?.artisanId ? artisans.find((a) => a.id === authorUser.artisanId) : undefined);
+
+  // Dynamic Author Name: retrieved from linked profile
+  const authorName =
+    (isPostByUser ? currentUser?.name : null) ||
+    authorUser?.name ||
+    authorArtisan?.name ||
+    post.author ||
+    post.artisanName ||
+    (post as any).artisan ||
+    'Utilisateur';
+
+  // Dynamic Author Avatar
+  const authorAvatarUrl =
+    (isPostByUser ? (currentUser?.avatarUrl || currentUser?.photoUrl || currentUser?.avatar) : null) ||
+    authorUser?.avatarUrl ||
+    authorUser?.photoUrl ||
+    authorUser?.avatar ||
+    authorArtisan?.avatarUrl ||
+    authorArtisan?.photoUrl ||
+    post.artisanAvatar ||
+    (post as any).authorAvatar ||
+    '';
+
   const postMedia = post.mediaUrl || (post as any).image;
   const postText = post.content || (post as any).description || post.texte || '';
   const isVideoMedia =
     post.mediaType === 'video' ||
     (postMedia && typeof postMedia === 'string' && postMedia.startsWith('data:video'));
-
-  // Find real author in artisans or users database to verify badge strictly (Règle 2 & 7)
-  const authorArtisan = post.artisanId
-    ? artisans.find((a) => a.id === post.artisanId)
-    : artisans.find((a) => a.name.trim().toLowerCase() === authorName.trim().toLowerCase());
-
-  const authorUser = post.userId
-    ? users.find((u) => u.id === post.userId)
-    : undefined;
 
   // Strict verification check (NEVER a fake badge - Règle 2 & 7)
   const isActuallyVerified = Boolean(
@@ -99,6 +129,7 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
   const isOwner = Boolean(
     !currentUser ||
     post.userId === 'current-user' ||
+    isPostByUser ||
     (currentUser?.id && String(post.userId) === String(currentUser.id)) ||
     (currentArtisan?.id && (String(post.userId) === String(currentArtisan.id) || post.artisanId === currentArtisan.id)) ||
     (currentUser?.artisanId && (post.artisanId === currentUser.artisanId || String(post.userId) === String(currentUser.artisanId))) ||
@@ -269,13 +300,9 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
         >
           {/* Photo de profil ronde */}
           <div className="relative shrink-0">
-            {post.artisanAvatar || authorArtisan?.avatarUrl || authorUser?.avatarUrl ? (
+            {authorAvatarUrl ? (
               <img
-                src={
-                  post.artisanAvatar ||
-                  authorArtisan?.avatarUrl ||
-                  authorUser?.avatarUrl
-                }
+                src={authorAvatarUrl}
                 alt={authorName}
                 className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border border-neutral-200 shadow-2xs group-hover:scale-105 transition-transform"
                 referrerPolicy="no-referrer"

@@ -27,9 +27,14 @@ interface TestStep {
   detail?: string;
 }
 
-export const TestProtocolModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
+export const TestProtocolModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  autoStart?: boolean;
+}> = ({
   isOpen,
   onClose,
+  autoStart = false,
 }) => {
   const {
     users,
@@ -46,6 +51,7 @@ export const TestProtocolModal: React.FC<{ isOpen: boolean; onClose: () => void 
   const [testUserId, setTestUserId] = useState<string | null>(null);
   const [testPostId, setTestPostId] = useState<string | null>(null);
   const [testArtisanId, setTestArtisanId] = useState<number | null>(null);
+  const hasAutoStartedRef = React.useRef(false);
 
   const [steps, setSteps] = useState<TestStep[]>([
     {
@@ -91,8 +97,6 @@ export const TestProtocolModal: React.FC<{ isOpen: boolean; onClose: () => void 
       status: 'pending',
     },
   ]);
-
-  if (!isOpen) return null;
 
   const updateStep = (id: string, status: TestStep['status'], detail?: string) => {
     setSteps((prev) =>
@@ -304,6 +308,18 @@ export const TestProtocolModal: React.FC<{ isOpen: boolean; onClose: () => void 
     }
   };
 
+  React.useEffect(() => {
+    if (isOpen && autoStart && !hasAutoStartedRef.current && !isRunning) {
+      hasAutoStartedRef.current = true;
+      runFullTestProtocol();
+    }
+    if (!isOpen) {
+      hasAutoStartedRef.current = false;
+    }
+  }, [isOpen, autoStart]);
+
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-neutral-200 space-y-6 my-8">
@@ -311,11 +327,14 @@ export const TestProtocolModal: React.FC<{ isOpen: boolean; onClose: () => void 
         <div className="flex items-start justify-between gap-4 pb-4 border-b border-neutral-100">
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-orange-100 text-[#FF6B00]">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Protocole de Test Conforme — Section 10</span>
+              <span className="text-sm">⚡</span>
+              <span>Protocole de Test Rapide & Automatisé — Section 10</span>
             </div>
-            <h3 className="text-xl font-black text-neutral-900 mt-1">
-              Validation Complète du Workflow Utilisateur & Artisan
+            <h3 className="text-xl font-black text-neutral-900 mt-1 flex items-center gap-2">
+              <span>Validation Complète du Workflow</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                Mode Rapide ⚡
+              </span>
             </h3>
             <p className="text-xs text-neutral-500">
               Teste l'inscription avec géolocalisation obligatoire, promotion artisan, publication de contenu, visibilité Super Admin et nettoyage sécurisé.
@@ -391,17 +410,17 @@ export const TestProtocolModal: React.FC<{ isOpen: boolean; onClose: () => void 
             type="button"
             onClick={runFullTestProtocol}
             disabled={isRunning}
-            className="w-full sm:w-auto px-5 py-3 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white text-xs font-bold shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60"
+            className="w-full sm:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-[#FF6B00] to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs font-black shadow-md shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60 transform active:scale-95"
           >
             {isRunning ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Exécution du protocole...</span>
+                <span>Exécution du protocole rapide...</span>
               </>
             ) : (
               <>
-                <Play className="w-4 h-4 fill-white" />
-                <span>Exécuter le Protocole Complet (Étapes 1 à 6)</span>
+                <span className="text-sm">⚡</span>
+                <span>Lancer le Test Rapide (Étapes 1 à 6)</span>
               </>
             )}
           </button>

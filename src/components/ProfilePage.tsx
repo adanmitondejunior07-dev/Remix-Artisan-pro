@@ -37,6 +37,7 @@ import {
   Loader2,
   Pencil,
   Mail,
+  Navigation,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { isSuperAdmin } from '../config/adminConfig.ts';
@@ -243,6 +244,8 @@ export const ProfilePage: React.FC = () => {
   const [selectedPhotoPreview, setSelectedPhotoPreview] = useState<string | null>(null);
 
   // États pour la modification du profil
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
   const [editName, setEditName] = useState(targetName);
   const [editEmail, setEditEmail] = useState(targetEmail);
   const [editTrade, setEditTrade] = useState(targetTrade);
@@ -261,8 +264,17 @@ export const ProfilePage: React.FC = () => {
   const [quickNameInput, setQuickNameInput] = useState(targetName);
 
   useEffect(() => {
-    setQuickNameInput(isOwnProfile ? (currentUser?.name || currentArtisan?.name || targetName) : targetName);
-    setEditName(isOwnProfile ? (currentUser?.name || currentArtisan?.name || targetName) : targetName);
+    const currentName = isOwnProfile ? (currentUser?.name || currentArtisan?.name || targetName) : targetName;
+    setQuickNameInput(currentName);
+    setEditName(currentName);
+    const parts = (currentName || '').trim().split(' ');
+    if (parts.length > 1) {
+      setEditFirstName(parts.slice(0, -1).join(' '));
+      setEditLastName(parts[parts.length - 1]);
+    } else {
+      setEditFirstName(currentName || '');
+      setEditLastName('');
+    }
     setEditEmail(isOwnProfile ? (currentUser?.email || targetEmail) : targetEmail);
     setEditTrade(isOwnProfile ? (currentUser?.trade || currentArtisan?.trade || targetTrade) : targetTrade);
     setEditCity(isOwnProfile ? (currentUser?.city || currentArtisan?.city || targetCity) : targetCity);
@@ -283,6 +295,18 @@ export const ProfilePage: React.FC = () => {
     setIsQuickEditingName(false);
     // Isoler la modification strictement au compte de l'utilisateur connecté
     await updateProfileName(newName);
+  };
+
+  const handleFirstNameChange = (val: string) => {
+    setEditFirstName(val);
+    const full = [val.trim(), editLastName.trim()].filter(Boolean).join(' ');
+    setEditName(full);
+  };
+
+  const handleLastNameChange = (val: string) => {
+    setEditLastName(val);
+    const full = [editFirstName.trim(), val.trim()].filter(Boolean).join(' ');
+    setEditName(full);
   };
 
   // Historique d'appels VoIP (pour artisan)
@@ -396,9 +420,11 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault();
     setIsSavingProfile(true);
     try {
+      const computedFullName = [editFirstName.trim(), editLastName.trim()].filter(Boolean).join(' ') || editName.trim();
+
       if (!isOwnProfile && selectedArtisan && canEdit) {
         await api.updateArtisan(selectedArtisan.id, {
-          name: editName.trim(),
+          name: computedFullName,
           trade: editTrade.trim(),
           city: editCity.trim(),
           country: editCountry.trim(),
@@ -408,7 +434,7 @@ export const ProfilePage: React.FC = () => {
           facebook: editFacebook.trim(),
           tiktok: editTiktok.trim(),
         });
-        selectedArtisan.name = editName.trim();
+        selectedArtisan.name = computedFullName;
         selectedArtisan.trade = editTrade.trim();
         selectedArtisan.city = editCity.trim();
         selectedArtisan.country = editCountry.trim();
@@ -422,7 +448,7 @@ export const ProfilePage: React.FC = () => {
       if (isOwnProfile && currentUser) {
         await updateUserProfile(
           {
-            name: editName.trim(),
+            name: computedFullName,
             city: editCity.trim(),
             country: editCountry.trim(),
             phone: editPhone.trim(),
@@ -435,7 +461,7 @@ export const ProfilePage: React.FC = () => {
           },
           (currentUser.role === 'artisan' || currentArtisan)
             ? {
-                name: editName.trim(),
+                name: computedFullName,
                 trade: editTrade.trim(),
                 city: editCity.trim(),
                 country: editCountry.trim(),
@@ -484,9 +510,32 @@ export const ProfilePage: React.FC = () => {
     }
   };
 
-  const distance = isTargetingArtisan && selectedArtisan?.lat && selectedArtisan?.lng
-    ? calculateDistance(selectedArtisan.lat, selectedArtisan.lng)
+  const artisanLat = selectedArtisan?.lat ?? (selectedArtisan as any)?.latitude;
+  const artisanLng = selectedArtisan?.lng ?? (selectedArtisan as any)?.longitude;
+
+  const distance = isTargetingArtisan && typeof artisanLat === 'number' && typeof artisanLng === 'number' && artisanLat !== 0 && artisanLng !== 0
+    ? calculateDistance(artisanLat, artisanLng)
     : null;
+
+  const handleOpenArtisanLocation = () => {
+    const lat = artisanLat;
+    const lng = artisanLng;
+    const city = targetCity || selectedArtisan?.city || 'Abidjan';
+    const country = targetCountry || selectedArtisan?.country || 'Côte d’Ivoire';
+    const address = selectedArtisan?.address || (selectedArtisan as any)?.quartier || '';
+    const query = [address, city, country].filter(Boolean).join(', ');
+
+    let mapUrl = '';
+    if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      // Coordonnées GPS réelles : ouvrir directement l'itinéraire / navigation
+      mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    } else {
+      // Pas de coordonnées GPS : ouvrir la carte avec ville, pays et adresse
+      mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query || 'Abidjan, Côte d’Ivoire')}`;
+    }
+
+    window.open(mapUrl, '_blank', 'noopener,noreferrer');
+  };
 
   const canEdit = isOwnProfile || isSuperAdmin(currentUser) || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
@@ -950,6 +999,46 @@ export const ProfilePage: React.FC = () => {
               </div>
             </div>
 
+            {/* 1. LOCALISATION DE L'ARTISAN & BOUTON POUR LE REJOINDRE (Règle Localisation) */}
+            {isTargetingArtisan && (
+              <div className="my-2.5 p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-orange-50/80 via-amber-50/40 to-orange-50/80 border border-orange-200/90 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#FF6B00] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                      <MapPin className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
+                        Localisation de l'artisan
+                      </div>
+                      <div className="text-xs sm:text-sm font-black text-neutral-900 truncate">
+                        📍 {targetCity}{selectedArtisan?.address ? `, ${selectedArtisan.address}` : (selectedArtisan as any)?.quartier ? `, ${(selectedArtisan as any).quartier}` : ''}, {targetCountry}
+                      </div>
+                      {distance !== null ? (
+                        <div className="text-[11px] font-medium text-emerald-700 flex items-center gap-1 mt-0.5">
+                          <span>À environ {distance} km de votre position</span>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-neutral-500 mt-0.5">
+                          Atelier & zone d'intervention
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenArtisanLocation}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white text-xs font-black flex items-center justify-center gap-2 transition-transform shadow-xs cursor-pointer shrink-0"
+                    title="Ouvrir la navigation GPS pour rejoindre l'artisan"
+                  >
+                    <Navigation className="w-3.5 h-3.5 text-[#FF6B00]" />
+                    <span>📍 VOIR LA LOCALISATION</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Boutons d'action Artisan : Contacter (WhatsApp) & Devis (Règle 16) */}
             {isTargetingArtisan && !isOwnProfile && (
               <div className="grid grid-cols-2 gap-2.5 pt-1">
@@ -1116,6 +1205,43 @@ export const ProfilePage: React.FC = () => {
                 <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed">
                   {targetBio}
                 </p>
+              </div>
+
+              {/* Localisation claire & Bouton Rejoindre */}
+              <div className="pt-3 border-t border-neutral-100 space-y-2">
+                <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center justify-between">
+                  <span>Localisation & Accès</span>
+                  {distance !== null && (
+                    <span className="text-[11px] font-medium text-emerald-700">
+                      À ~{distance} km
+                    </span>
+                  )}
+                </h4>
+                <div className="p-3.5 rounded-xl bg-orange-50/70 border border-orange-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-[#FF6B00] text-white flex items-center justify-center shrink-0">
+                      <MapPin className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-black text-xs sm:text-sm text-neutral-900 truncate">
+                        📍 {targetCity}{selectedArtisan?.address ? `, ${selectedArtisan.address}` : (selectedArtisan as any)?.quartier ? `, ${(selectedArtisan as any).quartier}` : ''}, {targetCountry}
+                      </div>
+                      <div className="text-[11px] text-neutral-600">
+                        {isTargetingArtisan ? "Atelier et zone d'intervention de l'artisan" : "Zone géographique"}
+                      </div>
+                    </div>
+                  </div>
+                  {isTargetingArtisan && (
+                    <button
+                      type="button"
+                      onClick={handleOpenArtisanLocation}
+                      className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 active:scale-95 text-white text-xs font-black flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer shrink-0"
+                    >
+                      <Navigation className="w-3.5 h-3.5 text-[#FF6B00]" />
+                      <span>📍 VOIR LA LOCALISATION</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Coordonnées de contact */}
@@ -1566,14 +1692,90 @@ export const ProfilePage: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveProfile} className="overflow-y-auto py-3 space-y-3.5 text-xs">
+              {/* Photos : Profil & Couverture (Règle 2) */}
+              <div className="p-3 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {targetAvatar ? (
+                    <img
+                      src={targetAvatar}
+                      alt="Avatar actuel"
+                      className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-xs shrink-0"
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-neutral-800 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                      {targetEmoji || targetName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="font-bold text-neutral-900 text-xs">Photos du profil</div>
+                    <div className="text-[10px] text-neutral-500 truncate">Photo de profil & bannière</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => avatarFileInputRef.current?.click()}
+                    className="px-2.5 py-1.5 rounded-lg bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                    title="Changer la photo de profil"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-[#FF6B00]" />
+                    <span>Photo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCoverModalOpen(true)}
+                    className="px-2.5 py-1.5 rounded-lg bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-800 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                    title="Changer la photo de couverture"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 text-[#FF6B00]" />
+                    <span>Couverture</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Prénom et Nom de famille (Règle 2) */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Prénom *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editFirstName}
+                    onChange={(e) => handleFirstNameChange(e.target.value)}
+                    placeholder="Prénom"
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-neutral-700 mb-1">Nom de famille</label>
+                  <input
+                    type="text"
+                    value={editLastName}
+                    onChange={(e) => handleLastNameChange(e.target.value)}
+                    placeholder="Nom"
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block font-bold text-neutral-700 mb-1">Nom et prénom *</label>
+                <label className="block font-bold text-neutral-700 mb-1">Nom complet affiché *</label>
                 <input
                   type="text"
                   required
                   value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00]"
+                  onChange={(e) => {
+                    setEditName(e.target.value);
+                    const parts = e.target.value.trim().split(' ');
+                    if (parts.length > 1) {
+                      setEditFirstName(parts.slice(0, -1).join(' '));
+                      setEditLastName(parts[parts.length - 1]);
+                    } else {
+                      setEditFirstName(e.target.value);
+                      setEditLastName('');
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:outline-none focus:border-[#FF6B00] font-semibold"
                 />
               </div>
 

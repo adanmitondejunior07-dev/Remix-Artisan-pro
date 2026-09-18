@@ -11,6 +11,7 @@ import type {
   AppNotification,
   Subscription,
   Payment,
+  SocialPost,
 } from '../src/types.ts';
 
 const DB_FILE = path.join(process.cwd(), 'data', 'artisan_pro_db.json');
@@ -26,6 +27,8 @@ export interface DatabaseData {
   notifications: AppNotification[];
   subscriptions: Subscription[];
   payments: Payment[];
+  publications?: SocialPost[];
+  deletedPublicationIds?: string[];
 }
 
 const defaultPlans: Plan[] = [
@@ -1004,6 +1007,54 @@ class DatabaseStore {
     this.data.payments[index] = { ...this.data.payments[index], ...updates };
     this.persist();
     return this.data.payments[index];
+  }
+
+  // ==========================================
+  // TABLE: Publications (Fil d'actualité & Social)
+  // ==========================================
+  getPublications(): SocialPost[] {
+    const deleted = new Set(this.data.deletedPublicationIds || []);
+    return (this.data.publications || []).filter((p) => !deleted.has(String(p.id)));
+  }
+
+  getPublicationById(id: string): SocialPost | undefined {
+    const deleted = new Set(this.data.deletedPublicationIds || []);
+    if (deleted.has(String(id))) return undefined;
+    return (this.data.publications || []).find((p) => String(p.id) === String(id));
+  }
+
+  createPublication(post: SocialPost): SocialPost {
+    if (!this.data.publications) this.data.publications = [];
+    if (!this.data.deletedPublicationIds) this.data.deletedPublicationIds = [];
+    // Ensure it's removed from deleted list if re-created
+    this.data.deletedPublicationIds = this.data.deletedPublicationIds.filter((d) => d !== String(post.id));
+    const idx = this.data.publications.findIndex((p) => String(p.id) === String(post.id));
+    if (idx >= 0) {
+      this.data.publications[idx] = post;
+    } else {
+      this.data.publications.unshift(post);
+    }
+    this.persist();
+    return post;
+  }
+
+  deletePublication(id: string): boolean {
+    if (!this.data.deletedPublicationIds) {
+      this.data.deletedPublicationIds = [];
+    }
+    const strId = String(id);
+    if (!this.data.deletedPublicationIds.includes(strId)) {
+      this.data.deletedPublicationIds.push(strId);
+    }
+    if (this.data.publications) {
+      this.data.publications = this.data.publications.filter((p) => String(p.id) !== strId);
+    }
+    this.persist();
+    return true;
+  }
+
+  getDeletedPublicationIds(): string[] {
+    return [...(this.data.deletedPublicationIds || [])];
   }
 }
 

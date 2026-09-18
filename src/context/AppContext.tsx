@@ -234,6 +234,31 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 // Default coordinates: Abidjan Cocody (5.3599, -3.9870)
 export const DEFAULT_COORDS = { lat: 5.3599, lng: -3.9870 };
 
+// Helper to track permanently deleted publication IDs (tombstones) across refreshes/reloads
+export function getDeletedPublicationIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem('artisanpro_deleted_publication_ids');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return new Set(parsed.map(String));
+    }
+  } catch {}
+  return new Set();
+}
+
+export function addDeletedPublicationId(id: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getDeletedPublicationIds();
+    current.add(String(id));
+    localStorage.setItem(
+      'artisanpro_deleted_publication_ids',
+      JSON.stringify(Array.from(current))
+    );
+  } catch {}
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Restore session synchronously from localStorage (Facebook-style persistent session)
   const initialIsLoggedIn =
@@ -318,7 +343,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return [];
   });
 
-// Helper to load offline artisanPosts saved directly in localStorage
+  // Helper to load offline artisanPosts saved directly in localStorage
 function loadLocalArtisanPosts(): SocialPost[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -326,38 +351,41 @@ function loadLocalArtisanPosts(): SocialPost[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((p: any) => {
-      const isVideo =
-        p.mediaType === 'video' ||
-        p.type === 'video' ||
-        (p.image && typeof p.image === 'string' && p.image.startsWith('data:video'));
+    const deletedIds = getDeletedPublicationIds();
+    return parsed
+      .filter((p: any) => !deletedIds.has(String(p.id)))
+      .map((p: any) => {
+        const isVideo =
+          p.mediaType === 'video' ||
+          p.type === 'video' ||
+          (p.image && typeof p.image === 'string' && p.image.startsWith('data:video'));
 
-      return {
-        id: String(p.id),
-        userId: 'artisan_local',
-        author: p.artisan || 'Vous',
-        role: 'ARTISAN' as const,
-        artisanId: 1,
-        artisanName: p.artisan || 'Vous',
-        artisanTrade: 'Artisan Pro',
-        artisanEmoji: '🛠️',
-        verified: true,
-        city: 'Abidjan',
-        country: 'Côte d’Ivoire',
-        content: p.description || '',
-        mediaType: isVideo ? ('video' as const) : ('photo' as const),
-        mediaUrl: p.thumbnail || p.image || p.mediaUrl || '',
-        posterUrl: p.thumbnail || p.image || '',
-        mediaId: p.videoKey || `video_${p.id}`,
-        price: p.tarif ? (String(p.tarif).includes('FCFA') ? String(p.tarif) : `${p.tarif} FCFA`) : '20 000 FCFA',
-        likesCount: p.likes || 0,
-        likedBy: [],
-        viewsCount: 1,
-        comments: [],
-        sharesCount: 0,
-        createdAt: p.date ? new Date().toISOString() : new Date().toISOString(),
-      };
-    });
+        return {
+          id: String(p.id),
+          userId: 'artisan_local',
+          author: p.artisan || 'Vous',
+          role: 'ARTISAN' as const,
+          artisanId: 1,
+          artisanName: p.artisan || 'Vous',
+          artisanTrade: 'Artisan Pro',
+          artisanEmoji: '🛠️',
+          verified: true,
+          city: 'Abidjan',
+          country: 'Côte d’Ivoire',
+          content: p.description || '',
+          mediaType: isVideo ? ('video' as const) : ('photo' as const),
+          mediaUrl: p.thumbnail || p.image || p.mediaUrl || '',
+          posterUrl: p.thumbnail || p.image || '',
+          mediaId: p.videoKey || `video_${p.id}`,
+          price: p.tarif ? (String(p.tarif).includes('FCFA') ? String(p.tarif) : `${p.tarif} FCFA`) : '20 000 FCFA',
+          likesCount: p.likes || 0,
+          likedBy: [],
+          viewsCount: 1,
+          comments: [],
+          sharesCount: 0,
+          createdAt: p.date ? new Date().toISOString() : new Date().toISOString(),
+        };
+      });
   } catch (e) {
     console.warn('Error reading artisanPosts:', e);
     return [];
@@ -366,15 +394,16 @@ function loadLocalArtisanPosts(): SocialPost[] {
 
   // Social feed & community links
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>(() => {
-    const localArtisans = loadLocalArtisanPosts();
+    const deletedIds = getDeletedPublicationIds();
+    const localArtisans = loadLocalArtisanPosts().filter((p) => !deletedIds.has(String(p.id)));
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem('allPosts') || localStorage.getItem('artisanpro_social_posts');
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
-            const seen = new Set(localArtisans.map((p) => p.id));
-            const filtered = parsed.filter((p) => !seen.has(p.id));
+            const seen = new Set(localArtisans.map((p) => String(p.id)));
+            const filtered = parsed.filter((p) => !seen.has(String(p.id)) && !deletedIds.has(String(p.id)));
             return [...localArtisans, ...filtered];
           }
         }
@@ -382,18 +411,20 @@ function loadLocalArtisanPosts(): SocialPost[] {
         console.warn('Error loading social posts:', e);
       }
     }
+    const cleanInitial = INITIAL_POSTS.filter((p) => !deletedIds.has(String(p.id)));
     if (localArtisans.length > 0) {
-      return [...localArtisans, ...INITIAL_POSTS];
+      return [...localArtisans, ...cleanInitial];
     }
-    return INITIAL_POSTS;
+    return cleanInitial;
   });
 
   // Synchronisation dynamique sans rechargement de page
   useEffect(() => {
     const handleArtisanPostsUpdate = () => {
-      const localArtisans = loadLocalArtisanPosts();
+      const deletedIds = getDeletedPublicationIds();
+      const localArtisans = loadLocalArtisanPosts().filter((p) => !deletedIds.has(String(p.id)));
       setSocialPosts((prev) => {
-        const nonLocal = prev.filter((p) => p.userId !== 'artisan_local');
+        const nonLocal = prev.filter((p) => p.userId !== 'artisan_local' && !deletedIds.has(String(p.id)));
         return [...localArtisans, ...nonLocal];
       });
     };
@@ -699,15 +730,26 @@ function loadLocalArtisanPosts(): SocialPost[] {
       }
     });
 
+    // Fetch server-side permanently deleted publication IDs on mount
+    api.getDeletedPublicationIds().then((serverDeleted) => {
+      if (serverDeleted && serverDeleted.length > 0) {
+        serverDeleted.forEach((id) => addDeletedPublicationId(id));
+        setSocialPosts((prev) => prev.filter((p) => !serverDeleted.includes(String(p.id))));
+      }
+    }).catch(() => {});
+
     // Subscribe to global live Firestore updates for publications (Fil d'actualité partagé)
     const unsubscribePubs = firestoreService.onPublicationsChange((livePosts) => {
       if (livePosts && livePosts.length > 0) {
-        const localArtisans = loadLocalArtisanPosts();
-        const sorted = livePosts.sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        const seen = new Set(localArtisans.map((p) => p.id));
-        const filtered = sorted.filter((p) => !seen.has(p.id));
+        const deletedIds = getDeletedPublicationIds();
+        const localArtisans = loadLocalArtisanPosts().filter((p) => !deletedIds.has(String(p.id)));
+        const sorted = livePosts
+          .filter((p) => !deletedIds.has(String(p.id)))
+          .sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        const seen = new Set(localArtisans.map((p) => String(p.id)));
+        const filtered = sorted.filter((p) => !seen.has(String(p.id)));
         const combined = [...localArtisans, ...filtered];
         setSocialPosts(combined);
         if (typeof window !== 'undefined') {
@@ -968,6 +1010,11 @@ function loadLocalArtisanPosts(): SocialPost[] {
         );
       }
 
+      // Mise à jour de la liste globale des utilisateurs
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updatedUser.id ? { ...u, avatarUrl: photoUrl, photoUrl: photoUrl, avatar: photoUrl } : u))
+      );
+
       // 4. Mettre à jour l'avatar sur toutes les publications de l'utilisateur dans le feed social
       setSocialPosts((prev) =>
         prev.map((post) => {
@@ -1051,6 +1098,11 @@ function loadLocalArtisanPosts(): SocialPost[] {
         );
       }
 
+      // Mise à jour de la liste globale des utilisateurs
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updatedUser.id ? { ...u, bannerUrl: coverUrl, coverUrl: coverUrl } : u))
+      );
+
       showToast({
         title: 'Couverture mise à jour !',
         desc: 'Votre couverture a été enregistrée instantanément.',
@@ -1113,6 +1165,11 @@ function loadLocalArtisanPosts(): SocialPost[] {
           prev.map((a) => (a.id === updatedUser.artisanId ? { ...a, name: trimmed } : a))
         );
       }
+
+      // Mise à jour de la liste globale des utilisateurs
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updatedUser.id ? { ...u, name: trimmed } : u))
+      );
 
       // 4. Mettre à jour l'auteur sur toutes les publications sociales
       setSocialPosts((prev) =>
@@ -1200,6 +1257,34 @@ function loadLocalArtisanPosts(): SocialPost[] {
         setCurrentArtisan((prev) => (prev ? { ...prev, ...mergedArtisan } : prev));
         setArtisans((prev) =>
           prev.map((a) => (a.id === updatedUser.artisanId ? { ...a, ...mergedArtisan } : a))
+        );
+      }
+
+      // Mise à jour de la liste globale des utilisateurs
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updatedUser.id ? { ...u, ...userData } : u))
+      );
+
+      // Mettre à jour immédiatement les publications de l'utilisateur
+      if (updatedUser.name || userData.avatarUrl || userData.city) {
+        setSocialPosts((prev) =>
+          prev.map((post) => {
+            const isUserPost =
+              (updatedUser.id && String(post.userId) === String(updatedUser.id)) ||
+              (updatedUser.artisanId && post.artisanId === updatedUser.artisanId) ||
+              post.author === 'Vous' ||
+              (currentUser?.name && post.author && post.author.trim().toLowerCase() === currentUser.name.trim().toLowerCase());
+            if (isUserPost) {
+              return {
+                ...post,
+                ...(updatedUser.name ? { author: updatedUser.name, artisanName: updatedUser.name } : {}),
+                ...(userData.avatarUrl ? { authorAvatar: userData.avatarUrl, artisanAvatar: userData.avatarUrl } : {}),
+                ...(userData.city ? { city: userData.city } : {}),
+                ...(userData.country ? { country: userData.country } : {}),
+              };
+            }
+            return post;
+          })
         );
       }
 
@@ -1620,9 +1705,13 @@ function loadLocalArtisanPosts(): SocialPost[] {
         return;
       }
 
-      // 1. RETRAIT IMMÉDIAT DU FEED (0 ms de délai, ultra-rapide)
+      // 1. Enregistrement immédiat dans la liste des publications supprimées (tombstones)
+      // Ceci garantit qu'aucune requête ultérieure, rechargement ou synchronisation ne pourra la réafficher
+      addDeletedPublicationId(postId);
+
+      // 2. RETRAIT IMMÉDIAT DU FEED (0 ms de délai, ultra-rapide)
       setSocialPosts((prev) => {
-        const filtered = prev.filter((p) => p.id !== postId);
+        const filtered = prev.filter((p) => String(p.id) !== String(postId));
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('allPosts', JSON.stringify(filtered.slice(0, 50)));
@@ -1648,38 +1737,35 @@ function loadLocalArtisanPosts(): SocialPost[] {
 
       showToast({
         title: 'Publication supprimée',
-        desc: 'La publication a été retirée instantanément.',
+        desc: 'La publication a été supprimée définitivement côté serveur.',
         type: 'success',
       });
 
-      // 2. Nettoyage asynchrone en arrière-plan sans bloquer l'UI
-      (async () => {
-        // Si média stocké dans Firebase Storage, suppression
-        if (targetPost?.storagePath) {
-          try {
-            const { ref, deleteObject } = await import('firebase/storage');
-            const fileRef = ref(storage, targetPost.storagePath);
-            await deleteObject(fileRef).catch((err) => {
-              console.warn('deleteObject storage warning:', err);
-            });
-          } catch (e) {
-            console.warn('Erreur suppression Storage:', e);
-          }
-        }
+      // 3. SUPPRESSION RÉELLE CÔTÉ SERVEUR ET SUPABASE / FIRESTORE (AWAITÉE)
+      try {
+        await api.deletePublication(postId, currentUser?.id);
+      } catch (err) {
+        console.warn('Erreur suppression serveur/Firestore:', err);
+      }
 
-        // Supprimer du document Firestore collection "publications"
+      // 4. Si média stocké dans Firebase Storage, suppression
+      if (targetPost?.storagePath) {
         try {
-          await firestoreService.deletePublication(postId);
+          const { ref, deleteObject } = await import('firebase/storage');
+          const fileRef = ref(storage, targetPost.storagePath);
+          await deleteObject(fileRef).catch((err) => {
+            console.warn('deleteObject storage warning:', err);
+          });
         } catch (e) {
-          console.warn('Erreur deletePublication firestore:', e);
+          console.warn('Erreur suppression Storage:', e);
         }
+      }
 
-        // Suppression dans IndexedDB si existant
-        try {
-          const { deleteVideoAndThumbnail } = await import('../services/indexedDbService.ts');
-          await deleteVideoAndThumbnail(postId);
-        } catch {}
-      })();
+      // 5. Suppression dans IndexedDB si existant
+      try {
+        const { deleteVideoAndThumbnail } = await import('../services/indexedDbService.ts');
+        await deleteVideoAndThumbnail(postId);
+      } catch {}
     },
     [socialPosts, currentUser, currentArtisan, showToast]
   );

@@ -483,6 +483,14 @@ export const api = {
         id: userId,
       };
       await firestoreService.saveClient(updatedUser);
+      // Synchronisation avec le backend Express
+      try {
+        await fetch(`/api/auth/users/${userId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedUser),
+        }).catch(() => {});
+      } catch {}
       return updatedUser;
     } catch (e) {
       console.warn('Fallback updateUser in firestore:', e);
@@ -502,6 +510,60 @@ export const api = {
    */
   async uploadCoverPhoto(id: string | number, coverUrl: string): Promise<void> {
     await firestoreService.uploadCoverPhoto(id, coverUrl);
+  },
+
+  /**
+   * SUPPRESSION RÉELLE DE PUBLICATION CÔTÉ SERVEUR & BASE DE DONNÉES
+   * Enregistre l'ID dans la liste d'exclusion (tombstones) et supprime de Firestore et du serveur
+   */
+  async deletePublication(postId: string, userId?: string): Promise<{ success: boolean }> {
+    // 1. Sauvegarder localement dans les tombstones
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('artisanpro_deleted_publication_ids') || '[]';
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && !parsed.includes(String(postId))) {
+          parsed.push(String(postId));
+          localStorage.setItem('artisanpro_deleted_publication_ids', JSON.stringify(parsed));
+        }
+      } catch {}
+    }
+
+    // 2. Supprimer côté serveur Express
+    try {
+      await fetch(`/api/publications/${postId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(userId ? { 'x-user-id': String(userId) } : {}),
+        },
+        body: JSON.stringify({ userId }),
+      }).catch((e) => console.warn('Server deletePublication warning:', e));
+    } catch (err) {
+      console.warn('Network error on server deletePublication:', err);
+    }
+
+    // 3. Supprimer de Firestore collections 'posts' et 'publications'
+    try {
+      await firestoreService.deletePublication(postId);
+    } catch (err) {
+      console.warn('Firestore deletePublication warning:', err);
+    }
+
+    return { success: true };
+  },
+
+  async getDeletedPublicationIds(): Promise<string[]> {
+    try {
+      const res = await fetch('/api/publications/deleted-ids');
+      if (res.ok) {
+        const serverDeleted = await res.json();
+        if (Array.isArray(serverDeleted)) {
+          return serverDeleted;
+        }
+      }
+    } catch {}
+    return [];
   },
 
   // ============================================================

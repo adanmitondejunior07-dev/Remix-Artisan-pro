@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db.ts';
-import type { Artisan, MarketplaceService, Message, QuoteRequest, Transaction, AppNotification, User } from './src/types.ts';
+import type { Artisan, MarketplaceService, Message, QuoteRequest, Transaction, AppNotification, User, SocialPost } from './src/types.ts';
 
 async function startServer() {
   const app = express();
@@ -179,9 +179,76 @@ async function startServer() {
     res.json(db.getPlans());
   });
 
-  // Authentication
+  // Authentication & Users
   app.get('/api/auth/users', (req, res) => {
     res.json(db.getUsers());
+  });
+
+  app.put(['/api/auth/users/:id', '/api/users/:id'], (req, res) => {
+    const userId = req.params.id;
+    const updates: Partial<User> = req.body;
+    const updated = db.updateUser(userId, updates);
+    if (!updated) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+    res.json({ success: true, user: updated });
+  });
+
+  app.patch(['/api/auth/users/:id', '/api/users/:id'], (req, res) => {
+    const userId = req.params.id;
+    const updates: Partial<User> = req.body;
+    const updated = db.updateUser(userId, updates);
+    if (!updated) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+    res.json({ success: true, user: updated });
+  });
+
+  // Publications endpoints (Serveur & persistance réelle côté serveur)
+  app.get('/api/publications', (req, res) => {
+    res.json(db.getPublications());
+  });
+
+  app.get('/api/publications/deleted-ids', (req, res) => {
+    res.json(db.getDeletedPublicationIds());
+  });
+
+  app.post('/api/publications', (req, res) => {
+    const post: SocialPost = req.body;
+    if (!post || !post.id) {
+      return res.status(400).json({ error: 'Données de publication invalides' });
+    }
+    const created = db.createPublication(post);
+    res.json(created);
+  });
+
+  app.delete('/api/publications/:id', (req, res) => {
+    const postId = req.params.id;
+    const requestingUserId = (req.body?.userId || req.headers['x-user-id'] || req.query?.userId) as string | undefined;
+    const targetPost = db.getPublicationById(postId);
+
+    if (targetPost && requestingUserId) {
+      const user = db.getUserById(requestingUserId);
+      const isSuperAdm = user?.role === 'super_admin' || user?.role === 'admin';
+      const isOwner =
+        String(targetPost.userId) === String(requestingUserId) ||
+        targetPost.userId === 'current-user' ||
+        (user?.artisanId && targetPost.artisanId === user.artisanId);
+
+      if (!isSuperAdm && !isOwner) {
+        return res.status(403).json({
+          error: 'Action refusée: Seul l\'auteur de la publication ou un administrateur peut supprimer ce contenu.',
+        });
+      }
+    }
+
+    // Effectuer la suppression réelle côté serveur
+    db.deletePublication(postId);
+    res.json({
+      success: true,
+      deletedId: postId,
+      message: 'Publication supprimée avec succès côté serveur',
+    });
   });
 
   app.post('/api/auth/login', (req, res) => {

@@ -533,6 +533,7 @@ export const AdminPage: React.FC = () => {
   // État du modal de retrait Fondateur
   const [showFounderWithdrawModal, setShowFounderWithdrawModal] = useState(false);
   const [showTestProtocolModal, setShowTestProtocolModal] = useState(false);
+  const [testProtocolAutoStart, setTestProtocolAutoStart] = useState(true);
   const [founderOperator, setFounderOperator] = useState<'Wave' | 'Orange Money' | 'MTN' | 'Monniz'>('Wave');
   const [founderPhone, setFounderPhone] = useState('+225 0503444508');
   const [founderAmount, setFounderAmount] = useState('54050');
@@ -1104,16 +1105,32 @@ export const AdminPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            refreshData();
-            loadAdminData();
-            showToast({ title: 'Données actualisées', type: 'info' });
-          }}
-          className="px-4 py-2.5 rounded-2xl border border-neutral-300 hover:bg-neutral-50 text-xs font-bold text-neutral-700 flex items-center gap-2 self-start cursor-pointer shadow-xs"
-        >
-          <span>Actualiser les données</span>
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap self-start">
+          <button
+            type="button"
+            onClick={() => {
+              setTestProtocolAutoStart(true);
+              setShowTestProtocolModal(true);
+            }}
+            className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 via-[#FF6B00] to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs font-black flex items-center gap-2 cursor-pointer shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+            title="Lancer immédiatement le protocole de test rapide automatisé"
+          >
+            <span className="text-sm">⚡</span>
+            <span>Test Rapide</span>
+            <span className="px-1.5 py-0.5 rounded-md bg-white/20 text-[10px] font-bold">1-Clic</span>
+          </button>
+
+          <button
+            onClick={() => {
+              refreshData();
+              loadAdminData();
+              showToast({ title: 'Données actualisées', type: 'info' });
+            }}
+            className="px-4 py-2.5 rounded-2xl border border-neutral-300 hover:bg-neutral-50 text-xs font-bold text-neutral-700 flex items-center gap-2 cursor-pointer shadow-xs"
+          >
+            <span>Actualiser les données</span>
+          </button>
+        </div>
       </div>
 
       {/* === 3 ADMIN - ARTISANPRO AFRIQUE (GOUVERNANCE & ATTRIBUTION ÉCRANS) === */}
@@ -1626,11 +1643,16 @@ export const AdminPage: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setShowTestProtocolModal(true)}
-          className="px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer bg-purple-600 hover:bg-purple-700 text-white shadow-xs ml-auto"
+          onClick={() => {
+            setTestProtocolAutoStart(true);
+            setShowTestProtocolModal(true);
+          }}
+          className="px-4 py-2.5 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs ml-auto ring-2 ring-purple-300/40"
+          title="Lancer immédiatement le protocole de test rapide"
         >
-          <ShieldAlert className="w-4 h-4 text-purple-200" />
-          <span>Protocole de Test Global</span>
+          <span className="text-sm">⚡</span>
+          <span>Protocole Rapide</span>
+          <span className="px-1.5 py-0.5 rounded-md bg-white/20 text-[10px] font-bold">Auto</span>
         </button>
       </div>
 
@@ -3367,6 +3389,7 @@ export const AdminPage: React.FC = () => {
         <TestProtocolModal
           isOpen={showTestProtocolModal}
           onClose={() => setShowTestProtocolModal(false)}
+          autoStart={testProtocolAutoStart}
         />
       )}
     </div>
