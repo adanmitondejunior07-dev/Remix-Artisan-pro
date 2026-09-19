@@ -29,6 +29,7 @@ export interface DatabaseData {
   payments: Payment[];
   publications?: SocialPost[];
   deletedPublicationIds?: string[];
+  likes?: Array<{ id: string; user_id: string; publication_id: string }>;
 }
 
 const defaultPlans: Plan[] = [
@@ -343,38 +344,6 @@ const defaultArtisans: Artisan[] = [
 ];
 
 const defaultUsers: User[] = [
-  {
-    id: 'user-client-1',
-    name: 'Aminata Touré',
-    email: 'aminata.toure@gmail.com',
-    role: 'client',
-    phone: '+225 07 12 34 56',
-    city: 'Abidjan',
-    country: 'Côte d’Ivoire',
-    avatar: '👩🏽',
-  },
-  {
-    id: 'user-artisan-1',
-    name: 'Awa Koné',
-    email: 'awa.kone@artisanpro.africa',
-    role: 'artisan',
-    phone: '+225 07 45 67 89',
-    city: 'Abidjan',
-    country: 'Côte d’Ivoire',
-    artisanId: 1,
-    avatar: '👗',
-  },
-  {
-    id: 'user-artisan-2',
-    name: 'Moussa Traoré',
-    email: 'moussa.traore@artisanpro.africa',
-    role: 'artisan',
-    phone: '+225 05 32 14 56',
-    city: 'Abidjan',
-    country: 'Côte d’Ivoire',
-    artisanId: 2,
-    avatar: '⚡',
-  },
   {
     id: 'user-admin-principal',
     name: 'Admin Principal ArtisanPro Africa',
@@ -711,6 +680,9 @@ class DatabaseStore {
           notifications: parsed.notifications || defaultNotifications,
           subscriptions: parsed.subscriptions || [],
           payments: parsed.payments || [],
+          publications: parsed.publications || [],
+          deletedPublicationIds: parsed.deletedPublicationIds || [],
+          likes: parsed.likes || [],
         };
       }
     } catch (err) {
@@ -728,6 +700,9 @@ class DatabaseStore {
       notifications: defaultNotifications,
       subscriptions: [],
       payments: [],
+      publications: [],
+      deletedPublicationIds: [],
+      likes: [],
     };
 
     this.saveData(initial);
@@ -1012,9 +987,17 @@ class DatabaseStore {
   // ==========================================
   // TABLE: Publications (Fil d'actualité & Social)
   // ==========================================
-  getPublications(): SocialPost[] {
+  getPublications(filterType?: 'accueil' | 'marketplace' | string): SocialPost[] {
     const deleted = new Set(this.data.deletedPublicationIds || []);
-    return (this.data.publications || []).filter((p) => !deleted.has(String(p.id)));
+    let list = (this.data.publications || []).filter((p) => !deleted.has(String(p.id)));
+
+    if (filterType === 'accueil') {
+      list = list.filter((p) => p.type === 'accueil' || p.type === 'publication' || !p.type);
+    } else if (filterType === 'marketplace') {
+      list = list.filter((p) => p.type === 'marketplace' || p.type === 'article');
+    }
+
+    return list;
   }
 
   getPublicationById(id: string): SocialPost | undefined {
@@ -1055,6 +1038,63 @@ class DatabaseStore {
 
   getDeletedPublicationIds(): string[] {
     return [...(this.data.deletedPublicationIds || [])];
+  }
+
+  // ==========================================
+  // TABLE: Likes (Système de likes persistant)
+  // Table 'likes' : id, user_id, publication_id
+  // ==========================================
+  getLikes(): Array<{ id: string; user_id: string; publication_id: string }> {
+    return this.data.likes || [];
+  }
+
+  getLikesForPublication(publicationId: string): Array<{ id: string; user_id: string; publication_id: string }> {
+    return (this.data.likes || []).filter((l) => String(l.publication_id) === String(publicationId));
+  }
+
+  toggleLike(publicationId: string, userId: string): { liked: boolean; count: number } {
+    if (!this.data.likes) this.data.likes = [];
+    const pubIdStr = String(publicationId);
+    const userIdStr = String(userId);
+
+    const existingIndex = this.data.likes.findIndex(
+      (l) => String(l.publication_id) === pubIdStr && String(l.user_id) === userIdStr
+    );
+
+    let liked = false;
+    if (existingIndex >= 0) {
+      // Un-like: Supprime la ligne dans la table 'likes'
+      this.data.likes.splice(existingIndex, 1);
+      liked = false;
+    } else {
+      // Like: Ajoute une ligne dans la table 'likes'
+      this.data.likes.push({
+        id: `like-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        user_id: userIdStr,
+        publication_id: pubIdStr,
+      });
+      liked = true;
+    }
+
+    const currentLikesCount = this.data.likes.filter((l) => String(l.publication_id) === pubIdStr).length;
+
+    // Synchronisation sur l'objet publication correspondant
+    if (this.data.publications) {
+      const pub = this.data.publications.find((p) => String(p.id) === pubIdStr);
+      if (pub) {
+        pub.likesCount = currentLikesCount;
+        pub.likes = currentLikesCount;
+        if (!pub.likedBy) pub.likedBy = [];
+        if (liked) {
+          if (!pub.likedBy.includes(userIdStr)) pub.likedBy.push(userIdStr);
+        } else {
+          pub.likedBy = pub.likedBy.filter((u) => u !== userIdStr);
+        }
+      }
+    }
+
+    this.persist();
+    return { liked, count: currentLikesCount };
   }
 }
 

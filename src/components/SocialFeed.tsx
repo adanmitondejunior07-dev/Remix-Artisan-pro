@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Plus,
   Image as ImageIcon,
@@ -11,7 +11,11 @@ import type { SocialPost } from '../types.ts';
 import { PublierRealisation } from './PublierRealisation.tsx';
 import { SocialPostCard } from './SocialPostCard.tsx';
 
-export const SocialFeed: React.FC = () => {
+export interface SocialFeedProps {
+  feedType?: 'accueil' | 'marketplace';
+}
+
+export const SocialFeed: React.FC<SocialFeedProps> = ({ feedType = 'accueil' }) => {
   const { t: tLang } = useLang();
   const {
     socialPosts,
@@ -29,6 +33,27 @@ export const SocialFeed: React.FC = () => {
 
   const t = { ...tApp, ...tLang };
 
+  // Filtrage strict : Page d'accueil vs Marketplace
+  const filteredPosts = useMemo(() => {
+    return socialPosts.filter((post) => {
+      if (feedType === 'marketplace') {
+        // Uniquement les publications destinées à la Marketplace
+        return (
+          post.type === 'marketplace' ||
+          post.type === 'article' ||
+          Boolean(post.prix) ||
+          (post.price && post.price !== 'Tarif sur devis' && (post.price.includes('FCFA') || Boolean(post.priceValue)))
+        );
+      }
+      // Par défaut (accueil) : UNIQUEMENT les publications d'accueil
+      return (
+        post.type === 'accueil' ||
+        post.type === 'publication' ||
+        (!post.type && !post.prix && (!post.price || post.price === 'Tarif sur devis'))
+      );
+    });
+  }, [socialPosts, feedType]);
+
   // Barre de création rapide de publications sur le fil d'actualité
   const [newTexte, setNewTexte] = useState('');
   const [isCreatingPost, setIsCreatingPost] = useState(false);
@@ -44,14 +69,18 @@ export const SocialFeed: React.FC = () => {
       (currentArtisan as any)?.is_verified
     );
 
+    const targetPubType = feedType === 'marketplace' ? 'marketplace' : 'accueil';
+
     const newItem: Partial<SocialPost> = {
       id: `post-${Date.now()}`,
-      type: 'publication',
+      type: targetPubType,
       texte: newTexte.trim(),
       content: newTexte.trim(),
+      contenu: newTexte.trim(),
       user: authorName,
       author: authorName,
       userId: currentUser?.id ? String(currentUser.id) : undefined,
+      user_id: currentUser?.id ? String(currentUser.id) : undefined,
       artisanId: currentArtisan?.id || currentUser?.artisanId || undefined,
       likes: 0,
       likesCount: 0,
@@ -61,18 +90,20 @@ export const SocialFeed: React.FC = () => {
       sharesCount: 0,
       mediaType: 'text',
       createdAt: new Date().toISOString(),
+      date_creation: new Date().toISOString(),
       artisanName: authorName,
       artisanTrade: currentArtisan?.trade || (currentUser?.role === 'artisan' ? 'Artisan' : 'Membre'),
       verified: isActuallyVerified,
       city: currentArtisan?.city || currentUser?.city || 'Abidjan',
       country: currentArtisan?.country || currentUser?.country || 'Côte d’Ivoire',
+      price: feedType === 'marketplace' ? 'Prix à discuter' : undefined,
     };
 
     await createSocialPost(newItem as any);
     setNewTexte('');
     showToast({
-      title: 'Publication en ligne !',
-      desc: 'Visible immédiatement sur le fil d’actualité.',
+      title: feedType === 'marketplace' ? 'Article Marketplace en ligne !' : 'Publication en ligne !',
+      desc: feedType === 'marketplace' ? 'Visible dans la Marketplace.' : 'Visible sur le fil d’accueil.',
       type: 'success',
     });
   };
@@ -249,19 +280,33 @@ export const SocialFeed: React.FC = () => {
 
       {/* 4. Flux des publications (Règle 6: Centré, responsive 92-95% mobile, max 680px desktop) */}
       <div className="w-full space-y-3.5 sm:space-y-4">
-        {socialPosts.map((post) => (
-          <SocialPostCard
-            key={post.id}
-            post={post}
-            onAuthorClick={handleAuthorClick}
-          />
-        ))}
+        {filteredPosts.length > 0 ? (
+          filteredPosts.map((post) => (
+            <SocialPostCard
+              key={post.id}
+              post={post}
+              onAuthorClick={handleAuthorClick}
+            />
+          ))
+        ) : (
+          <div className="bg-white rounded-2xl border border-neutral-200 p-8 text-center text-neutral-500">
+            <p className="text-sm font-semibold">
+              {feedType === 'marketplace'
+                ? 'Aucun article dans la Marketplace pour le moment.'
+                : 'Aucune publication sur le fil d’accueil pour le moment.'}
+            </p>
+            <p className="text-xs text-neutral-400 mt-1">
+              Soyez le premier à publier !
+            </p>
+          </div>
+        )}
       </div>
 
       {/* 5. Modale pour publier une réalisation (Photo / Vidéo / Devis) */}
       <PublierRealisation
         isOpen={isCreatingPost}
         onClose={() => setIsCreatingPost(false)}
+        targetType={feedType}
       />
     </div>
   );

@@ -12,6 +12,7 @@ import type {
   Subscription,
   Payment,
   PasswordReset,
+  SocialPost,
 } from '../types.ts';
 import { firestoreService } from './firestoreService.ts';
 import {
@@ -274,7 +275,7 @@ export const api = {
   },
 
   // ============================================================
-  // CLIENTS & USERS (Firestore Collection 'clients')
+  // CLIENTS & USERS (Firestore Collection 'clients' & DB 'users')
   // ============================================================
   async getUsers(): Promise<User[]> {
     try {
@@ -284,7 +285,7 @@ export const api = {
       console.warn('Fallback getUsers:', e);
     }
     try {
-      const res = await fetch(`${BASE_URL}/auth/users`);
+      const res = await fetch(`${BASE_URL}/users`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) return data;
@@ -292,7 +293,7 @@ export const api = {
     } catch (e) {
       console.warn('Fallback getUsers from server:', e);
     }
-    return INITIAL_CLIENTS;
+    return [];
   },
 
   async login(payload: { email?: string; phone?: string; role?: string; userId?: string; password?: string; secretCode?: string }): Promise<{ user: User; artisan?: Artisan }> {
@@ -564,6 +565,47 @@ export const api = {
       }
     } catch {}
     return [];
+  },
+
+  // ============================================================
+  // PUBLICATIONS & LIKES (Séparation Accueil vs Marketplace & Likes persistants)
+  // ============================================================
+  async getPublications(filterType?: 'accueil' | 'marketplace'): Promise<SocialPost[]> {
+    try {
+      const url = filterType ? `${BASE_URL}/publications?type=${filterType}` : `${BASE_URL}/publications`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list)) return list;
+      }
+    } catch (e) {
+      console.warn('Fallback getPublications server:', e);
+    }
+    return [];
+  },
+
+  async createPublication(post: Partial<SocialPost>): Promise<SocialPost> {
+    const res = await fetch(`${BASE_URL}/publications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(post),
+    });
+    if (!res.ok) {
+      throw new Error('Erreur lors de la création de la publication');
+    }
+    return res.json();
+  },
+
+  async toggleLike(publicationId: string, userId: string): Promise<{ liked: boolean; count: number }> {
+    const res = await fetch(`${BASE_URL}/likes/toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicationId, userId }),
+    });
+    if (!res.ok) {
+      throw new Error('Erreur lors de la modification du like');
+    }
+    return res.json();
   },
 
   // ============================================================

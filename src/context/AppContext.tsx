@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type {
   Artisan,
   Plan,
@@ -39,6 +39,7 @@ import {
 import { isExactAdminEmail, getAdminUserByEmail, isSuperAdmin } from '../config/adminConfig.ts';
 import { uploadOrStoreMedia } from '../services/mediaStorage.ts';
 import { storage } from '../firebase/config.ts';
+import { toggleSupabaseLike } from '../services/supabase.ts';
 
 export type PageName =
   | 'home'
@@ -300,7 +301,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Always start on home (feed of artisans), never on account/profile
   const [page, setPage] = useState<PageName>('home');
   const [artisans, setArtisans] = useState<Artisan[]>([]);
-  const [users, setUsers] = useState<User[]>(INITIAL_CLIENTS);
+  const [users, setUsers] = useState<User[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [services, setServices] = useState<MarketplaceService[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -308,6 +309,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedArtisanId, setSelectedArtisanId] = useState<number | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  const currentUserRef = useRef<User | null>(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -650,6 +656,11 @@ function loadLocalArtisanPosts(): SocialPost[] {
   }, []);
 
   const go = useCallback((targetPage: PageName) => {
+    if (targetPage === 'profile') {
+      setSelectedArtisanId(null);
+      setSelectedUserId(null);
+      setSelectedUser(null);
+    }
     setPage(targetPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
@@ -660,15 +671,15 @@ function loadLocalArtisanPosts(): SocialPost[] {
         api.getArtisans().catch(() => INITIAL_ARTISANS),
         api.getPlans().catch(() => INITIAL_PLANS),
         api.getServices().catch(() => INITIAL_SERVICES),
-        api.getNotifications(currentUser?.id).catch(() => INITIAL_NOTIFICATIONS),
-        api.getUsers().catch(() => INITIAL_CLIENTS),
+        api.getNotifications(currentUserRef.current?.id).catch(() => INITIAL_NOTIFICATIONS),
+        api.getUsers().catch(() => []),
       ]);
 
       const resolvedArtisans = artList && artList.length > 0 ? artList : INITIAL_ARTISANS;
       const resolvedPlans = planList && planList.length > 0 ? planList : INITIAL_PLANS;
       const resolvedServices = srvList && srvList.length > 0 ? srvList : INITIAL_SERVICES;
       const resolvedNotifs = notifList && notifList.length > 0 ? notifList : INITIAL_NOTIFICATIONS;
-      const resolvedUsers = userList && userList.length > 0 ? userList : INITIAL_CLIENTS;
+      const resolvedUsers = userList && userList.length > 0 ? userList : [];
 
       setArtisans(resolvedArtisans);
       setUsers(resolvedUsers);
@@ -686,30 +697,37 @@ function loadLocalArtisanPosts(): SocialPost[] {
 
       if (isLogged) {
         let userToSet: User | null = null;
-        if (resolvedUsers.length > 0) {
+        const currentActiveId = currentUserRef.current?.id || savedUserId;
+        const currentActiveEmail = currentUserRef.current?.email || savedEmail;
+
+        if (resolvedUsers.length > 0 && (currentActiveId || currentActiveEmail)) {
           userToSet =
             resolvedUsers.find(
               (u) =>
-                u.id === savedUserId ||
-                (savedEmail && u.email?.toLowerCase() === savedEmail.toLowerCase())
+                (currentActiveId && String(u.id) === String(currentActiveId)) ||
+                (currentActiveEmail && u.email?.toLowerCase() === currentActiveEmail.toLowerCase())
             ) || null;
         }
         if (!userToSet) {
           try {
-            const raw = localStorage.getItem('userData');
+            const raw = localStorage.getItem('artisanPro_user') || localStorage.getItem('userData');
             if (raw) userToSet = JSON.parse(raw);
           } catch {}
         }
         if (userToSet) {
+          if (currentUserRef.current?.name && !userToSet.name) {
+            userToSet.name = currentUserRef.current.name;
+          }
           setCurrentUser(userToSet);
           localStorage.setItem('userData', JSON.stringify(userToSet));
+          localStorage.setItem('artisanPro_user', JSON.stringify(userToSet));
           if (userToSet.artisanId) {
             const art = resolvedArtisans.find((a) => a.id === userToSet!.artisanId) || null;
             setCurrentArtisan(art);
           }
         }
-      } else if (currentUser?.artisanId) {
-        const art = resolvedArtisans.find((a) => a.id === currentUser.artisanId) || null;
+      } else if (currentUserRef.current?.artisanId) {
+        const art = resolvedArtisans.find((a) => a.id === currentUserRef.current?.artisanId) || null;
         setCurrentArtisan(art);
       }
     } catch (err) {
@@ -719,7 +737,7 @@ function loadLocalArtisanPosts(): SocialPost[] {
       setServices((prev) => (prev.length > 0 ? prev : INITIAL_SERVICES));
       setNotifications((prev) => (prev.length > 0 ? prev : INITIAL_NOTIFICATIONS));
     }
-  }, [currentUser]);
+  }, []);
 
   useEffect(() => {
     refreshData();
@@ -1824,22 +1842,26 @@ function loadLocalArtisanPosts(): SocialPost[] {
 
   const likeSocialPost = useCallback(
     async (postId: string) => {
-      const currentUserId = currentUser?.id || 'guest';
+      const currentUserId = currentUserRef.current?.id || 'guest';
       let targetPostToSync: SocialPost | null = null;
 
       setSocialPosts((prev) => {
         const updated = prev.map((p) => {
-          if (p.id !== postId) return p;
-          const alreadyLiked = p.likedBy.includes(currentUserId);
-          const newLikesCount = alreadyLiked ? Math.max(0, p.likesCount - 1) : p.likesCount + 1;
+          if (String(p.id) !== String(postId)) return p;
+          const currentLikedBy = Array.isArray(p.likedBy) ? p.likedBy : [];
+          const alreadyLiked = currentLikedBy.includes(currentUserId) || Boolean(p.user_has_liked);
+          const currentCount = p.likesCount ?? p.likes ?? 0;
+          const newLikesCount = alreadyLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
           const newLikedBy = alreadyLiked
-            ? p.likedBy.filter((id) => id !== currentUserId)
-            : [...p.likedBy, currentUserId];
+            ? currentLikedBy.filter((id) => id !== currentUserId)
+            : [...currentLikedBy, currentUserId];
 
           const postUpdated: SocialPost = {
             ...p,
+            likes: newLikesCount,
             likesCount: newLikesCount,
             likedBy: newLikedBy,
+            user_has_liked: !alreadyLiked,
           };
           targetPostToSync = postUpdated;
           return postUpdated;
@@ -1857,11 +1879,19 @@ function loadLocalArtisanPosts(): SocialPost[] {
         return updated;
       });
 
+      // Synchronisation persistante du like (Serveur JSON + Supabase + Firestore)
+      try {
+        api.toggleLike(postId, currentUserId).catch(() => {});
+        toggleSupabaseLike(postId, currentUserId).catch(() => {});
+      } catch (err) {
+        console.warn('Erreur like persistence:', err);
+      }
+
       if (targetPostToSync) {
         firestoreService.savePublication(targetPostToSync).catch(() => {});
       }
     },
-    [currentUser]
+    []
   );
 
   const addPostComment = useCallback(

@@ -354,16 +354,6 @@
   ],
   "users": [
     {
-      "id": "user-client-1",
-      "name": "Aminata Touré",
-      "email": "aminata.toure@gmail.com",
-      "role": "client",
-      "phone": "+225 07 12 34 56",
-      "city": "Abidjan",
-      "country": "Côte d’Ivoire",
-      "avatar": "👩🏽"
-    },
-    {
       "id": "user-artisan-1",
       "name": "Awa Koné",
       "email": "awa.kone@artisanpro.africa",

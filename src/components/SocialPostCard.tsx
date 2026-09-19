@@ -140,7 +140,10 @@ export const SocialPostCard: React.FC<SocialPostCardProps> = ({
   const canModifyOrDelete = isOwner || isCurrentUserAdmin;
 
   // Likes & reactions count
-  const isLiked = post.likedBy?.includes(currentUser?.id || 'guest');
+  const isLiked = Boolean(
+    (Array.isArray(post.likedBy) && post.likedBy.includes(currentUser?.id || 'guest')) ||
+    post.user_has_liked
+  );
   const likesCount =
     post.likesCount !== undefined
       ? post.likesCount

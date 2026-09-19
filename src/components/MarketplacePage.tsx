@@ -501,7 +501,7 @@ export const MarketplacePage: React.FC = () => {
 
       {activeMarketTab === 'feed' ? (
         <div id="marketplace-feed-container">
-          <SocialFeed />
+          <SocialFeed feedType="marketplace" />
         </div>
       ) : (
         <>

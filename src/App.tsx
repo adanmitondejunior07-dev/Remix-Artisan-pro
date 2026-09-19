@@ -95,6 +95,8 @@ const AppContent: React.FC = () => {
         try {
           window.history.replaceState(null, '', '/');
         } catch {}
+      } else if ((pathname === '/admin' || window.location.hash === '#admin') && page !== 'admin') {
+        go('admin');
       } else if (pathname === '/admin/paiements' && page !== 'admin-paiements') {
         go('admin-paiements');
       }
@@ -169,18 +171,22 @@ const AppContent: React.FC = () => {
         return <ArtisanProSubscriptionsPage />;
       case 'mon-historique':
         return <MyPaymentHistoryPage />;
-      case 'admin':
-        if (!isSuperAdmin(currentUser)) {
+      case 'admin': {
+        const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || isSuperAdmin(currentUser);
+        if (!isAdmin) {
           go('home');
           return <HomePage />;
         }
         return <AdminPage />;
-      case 'admin-paiements':
-        if (!isSuperAdmin(currentUser)) {
+      }
+      case 'admin-paiements': {
+        const canAccessAdminPayments = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || isSuperAdmin(currentUser);
+        if (!canAccessAdminPayments) {
           go('home');
           return <HomePage />;
         }
         return <AdminPaymentsPage />;
+      }
       case 'admin-login':
         return <AdminLoginPage />;
       case 'dynamic-profile':

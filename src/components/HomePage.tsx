@@ -219,7 +219,7 @@ export const HomePage: React.FC = () => {
           </p>
         </div>
 
-        <SocialFeed />
+        <SocialFeed feedType="accueil" />
       </section>
 
       {/* Métiers populaires */}

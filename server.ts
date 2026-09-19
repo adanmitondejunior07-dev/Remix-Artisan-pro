@@ -179,8 +179,8 @@ async function startServer() {
     res.json(db.getPlans());
   });
 
-  // Authentication & Users
-  app.get('/api/auth/users', (req, res) => {
+  // Authentication & Users (SELECT * FROM users)
+  app.get(['/api/auth/users', '/api/users', '/api/admin/users'], (req, res) => {
     res.json(db.getUsers());
   });
 
@@ -204,9 +204,10 @@ async function startServer() {
     res.json({ success: true, user: updated });
   });
 
-  // Publications endpoints (Serveur & persistance réelle côté serveur)
+  // Publications endpoints (Séparation stricte Accueil vs Marketplace)
   app.get('/api/publications', (req, res) => {
-    res.json(db.getPublications());
+    const filterType = req.query.type as string | undefined;
+    res.json(db.getPublications(filterType));
   });
 
   app.get('/api/publications/deleted-ids', (req, res) => {
@@ -220,6 +221,20 @@ async function startServer() {
     }
     const created = db.createPublication(post);
     res.json(created);
+  });
+
+  // Likes persistants (Table 'likes' : id, user_id, publication_id)
+  app.post('/api/likes/toggle', (req, res) => {
+    const { publicationId, userId } = req.body;
+    if (!publicationId || !userId) {
+      return res.status(400).json({ error: 'publicationId et userId requis' });
+    }
+    const result = db.toggleLike(String(publicationId), String(userId));
+    res.json(result);
+  });
+
+  app.get('/api/likes/:publicationId', (req, res) => {
+    res.json(db.getLikesForPublication(req.params.publicationId));
   });
 
   app.delete('/api/publications/:id', (req, res) => {

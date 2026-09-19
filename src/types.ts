@@ -329,20 +329,55 @@ export interface PostComment {
   createdAt: string;
 }
 
+export type PublicationType = 'accueil' | 'marketplace';
+
+export interface DbUser {
+  id: string;
+  nom: string;
+  prenom: string;
+  role: 'admin' | 'artisan' | 'client';
+  telephone?: string;
+  photo_profil?: string;
+  localisation?: string;
+}
+
+export interface DbPublication {
+  id: string;
+  user_id: string;
+  contenu: string;
+  image?: string | null;
+  date_creation: string;
+  type: PublicationType;
+  prix?: string | number | null;
+  // Champs dérivés ou joints
+  user?: DbUser;
+  likes_count?: number;
+  user_has_liked?: boolean;
+}
+
+export interface DbLike {
+  id: string;
+  user_id: string;
+  publication_id: string;
+}
+
 export interface SocialPost {
   id: string;
   userId?: string;
+  user_id?: string;
   author?: string;
   user?: string;
   role?: 'ADMIN' | 'ARTISAN' | 'CLIENT' | string;
   isAdmin?: boolean;
   isPub?: boolean;
-  type?: 'publication' | 'article' | string;
+  type?: 'accueil' | 'marketplace' | 'publication' | 'article' | string;
   nom?: string;
-  prix?: string;
+  prix?: string | number;
   devise?: string;
   texte?: string;
+  contenu?: string;
   image?: string;
+  date_creation?: string;
   likes?: number;
   artisanId?: number;
   artisanName?: string;
@@ -362,6 +397,7 @@ export interface SocialPost {
   priceValue?: number;
   likesCount?: number;
   likedBy?: string[];
+  user_has_liked?: boolean;
   viewsCount?: number;
   comments?: PostComment[];
   sharesCount?: number;

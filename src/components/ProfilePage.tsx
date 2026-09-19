@@ -99,22 +99,24 @@ export const ProfilePage: React.FC = () => {
     (isOwnProfile && (currentUser?.role === 'artisan' || currentArtisan))
   );
 
-  // Informations effectives du profil affiché
+  // Informations effectives du profil affiché - Résolution stable garantie sans clignotement
+  const targetUserObj = isOwnProfile
+    ? currentUser
+    : (selectedUser || users.find(
+        (u) =>
+          (selectedUser && u.id === selectedUser.id) ||
+          (selectedArtisan && u.artisanId === selectedArtisan.id) ||
+          (selectedArtisan && u.email && selectedArtisan.email && u.email.trim().toLowerCase() === selectedArtisan.email.trim().toLowerCase())
+      ) || null);
+
   const targetName = isOwnProfile
     ? (currentUser?.name || currentArtisan?.name || 'Mon Profil')
-    : (selectedArtisan?.name || selectedUser?.name || 'Profil Membre');
+    : (selectedArtisan?.name || targetUserObj?.name || selectedUser?.name || 'Profil Membre');
 
-  // EMAIL DU PROFIL (DEMANDE EXPLICITE DE L'UTILISATEUR)
+  // EMAIL DU PROFIL
   const targetEmail = isOwnProfile
     ? (currentUser?.email || currentArtisan?.email || '')
-    : (selectedArtisan?.email || selectedUser?.email || '');
-
-  const targetUserObj = selectedUser || users.find(
-    (u) =>
-      (selectedUser && u.id === selectedUser.id) ||
-      (selectedArtisan && u.artisanId === selectedArtisan.id) ||
-      (targetEmail && u.email && u.email.trim().toLowerCase() === targetEmail.trim().toLowerCase())
-  );
+    : (selectedArtisan?.email || targetUserObj?.email || selectedUser?.email || '');
 
   const canShowEmail = Boolean(
     isOwnProfile ||

@@ -197,33 +197,24 @@ export const firestoreService = {
       const snapshot = await getDocs(colRef);
 
       if (snapshot.empty) {
-        if (!isSeedingClients) {
-          isSeedingClients = true;
-          try {
-            await Promise.all(
-              INITIAL_CLIENTS.map((client) =>
-                setDoc(doc(firestore, CLIENTS_COL, client.id), {
-                  ...client,
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                })
-              )
-            );
-          } finally {
-            isSeedingClients = false;
-          }
-        }
-        return INITIAL_CLIENTS;
+        return [];
       }
 
       const list: User[] = [];
       snapshot.forEach((d) => {
-        list.push(d.data() as User);
+        const u = d.data() as User;
+        // Filtrer les faux comptes de démo éventuels
+        const isDemo =
+          (u.email && (u.email.toLowerCase().includes('demo') || u.email.toLowerCase().includes('test'))) ||
+          (u.name && (u.name.toUpperCase().includes('YAO KOUASSI') || u.name.toUpperCase().includes('DEMO')));
+        if (!isDemo) {
+          list.push(u);
+        }
       });
       return list;
     } catch (err) {
-      console.warn('Firestore getClients fallback to initial data:', err);
-      return INITIAL_CLIENTS;
+      console.warn('Firestore getClients error:', err);
+      return [];
     }
   },
 

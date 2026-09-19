@@ -18,20 +18,32 @@ import {
 import { saveMediaBlob, getMediaBlob } from '../services/indexedDbService.ts';
 import { useApp } from '../context/AppContext.tsx';
 import { compressImageToDataUrl } from '../utils/imageCompression.ts';
-import { createSupabasePost } from '../services/supabase.ts';
+import { createSupabasePublication } from '../services/supabase.ts';
+import type { PublicationType } from '../types.ts';
 
 export interface PublierRealisationProps {
   isOpen: boolean;
   onClose: () => void;
   onPublished?: () => void;
+  targetType?: PublicationType;
 }
 
 export const PublierRealisation: React.FC<PublierRealisationProps> = ({
   isOpen,
   onClose,
   onPublished,
+  targetType = 'accueil',
 }) => {
   const { currentUser, currentArtisan, showToast, createSocialPost } = useApp();
+
+  // Type de destination : accueil ou marketplace
+  const [publicationType, setPublicationType] = useState<PublicationType>(targetType);
+
+  useEffect(() => {
+    if (targetType) {
+      setPublicationType(targetType);
+    }
+  }, [targetType, isOpen]);
 
   // Média et contenu du formulaire
   const [mediaType, setMediaType] = useState<'photo' | 'video'>('photo');
@@ -183,10 +195,18 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
   async function handlePublish(e?: React.FormEvent) {
     if (e && e.preventDefault) e.preventDefault();
 
-    const tarifInput = document.querySelector('input[placeholder*="FCFA"]') as HTMLInputElement | null;
-    const descTextarea = document.querySelector('textarea') as HTMLTextAreaElement | null;
-    const finalTarif = (tarifInput ? tarifInput.value : '') || tarif || '';
-    const finalDesc = (descTextarea ? descTextarea.value : '') || description || 'Réalisation artisanale';
+    const finalTarif = (tarif || '').trim();
+    const finalDesc = (description || '').trim() || 'Réalisation artisanale';
+
+    if (publicationType === 'marketplace' && !finalTarif) {
+      setErrorMessage('Le prix est obligatoire pour une publication sur la Marketplace.');
+      showToast({
+        title: 'Prix obligatoire',
+        desc: 'Veuillez renseigner le prix de vente ou de prestation pour la Marketplace.',
+        type: 'warning',
+      });
+      return;
+    }
 
     const postId = Date.now();
     const authorName = currentUser?.name || currentArtisan?.name || 'Artisan';
@@ -223,10 +243,18 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
         await saveMediaBlob(`thumb_${postId}`, thumbBlob);
       }
 
-      // Synchronisation Supabase (user_id, content, image_url, created_at)
-      await createSupabasePost(finalDesc, thumbUrl);
+      // Synchronisation Supabase (id, user_id, contenu, image, date_creation, type, prix)
+      await createSupabasePublication({
+        user_id: authorId || 'user',
+        contenu: finalDesc,
+        image: thumbUrl,
+        type: publicationType,
+        prix: publicationType === 'marketplace' ? finalTarif : null,
+      });
+
       if (createSocialPost) {
         await createSocialPost({
+          id: `post-${postId}`,
           author: authorName,
           role: 'ARTISAN',
           artisanId: artisanNumId,
@@ -238,25 +266,32 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
           city: authorCity,
           country: authorCountry,
           content: finalDesc,
+          contenu: finalDesc,
           mediaType: 'video',
           mediaUrl: thumbUrl,
+          image: thumbUrl,
+          type: publicationType,
           price: finalTarif,
+          prix: finalTarif,
         });
       }
 
       const newPost = {
         id: postId,
-        type: 'video',
+        type: publicationType,
         mediaType: 'video' as const,
-        image: thumbUrl, // Miniature JPEG légère pour affichage instantané
+        image: thumbUrl,
         thumbnail: thumbUrl,
         videoKey: `video_${postId}`,
         hasIndexedDbVideo: true,
         tarif: finalTarif,
+        prix: finalTarif,
         description: finalDesc,
+        contenu: finalDesc,
         artisan: authorName,
         likes: 0,
         date: new Date().toLocaleDateString(),
+        date_creation: new Date().toISOString(),
       };
 
       // Sauvegarde dans artisanPosts
@@ -325,10 +360,18 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
       return;
     }
 
-    // Enregistrement Supabase respectant strictement : id, user_id (uuid), content, image_url, created_at
-    await createSupabasePost(finalDesc, photoData);
+    // Enregistrement Supabase respectant : id, user_id (uuid), contenu, image, type, prix, date_creation
+    await createSupabasePublication({
+      user_id: authorId || 'user',
+      contenu: finalDesc,
+      image: photoData,
+      type: publicationType,
+      prix: publicationType === 'marketplace' ? finalTarif : null,
+    });
+
     if (createSocialPost) {
       await createSocialPost({
+        id: `post-${postId}`,
         author: authorName,
         role: 'ARTISAN',
         artisanId: artisanNumId,
@@ -340,23 +383,30 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
         city: authorCity,
         country: authorCountry,
         content: finalDesc,
+        contenu: finalDesc,
         mediaType: 'photo',
         mediaUrl: photoData,
+        image: photoData,
+        type: publicationType,
         price: finalTarif,
+        prix: finalTarif,
       });
     }
 
     const newPhotoPost = {
       id: postId,
-      type: 'photo',
+      type: publicationType,
       mediaType: 'photo' as const,
       image: photoData,
       thumbnail: photoData,
       tarif: finalTarif,
+      prix: finalTarif,
       description: finalDesc,
+      contenu: finalDesc,
       artisan: authorName,
       likes: 0,
       date: new Date().toLocaleDateString(),
+      date_creation: new Date().toISOString(),
     };
 
     let posts: any[] = [];
@@ -569,6 +619,69 @@ export const PublierRealisation: React.FC<PublierRealisationProps> = ({
               </p>
             </div>
           )}
+
+          {/* Destination de publication : Accueil vs Marketplace */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
+              Destination de la publication *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPublicationType('accueil')}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  publicationType === 'accueil'
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-xs'
+                    : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100'
+                }`}
+              >
+                <span>🏠 Fil d’Accueil</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPublicationType('marketplace')}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  publicationType === 'marketplace'
+                    ? 'border-[#FF6B00] bg-orange-50 text-[#FF6B00] shadow-xs'
+                    : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100'
+                }`}
+              >
+                <span>🛍️ Marketplace</span>
+              </button>
+            </div>
+            <p className="text-[11px] text-neutral-500 italic">
+              {publicationType === 'marketplace'
+                ? 'Visible uniquement sur la Marketplace (Prix obligatoire).'
+                : 'Visible sur la page d’accueil générale.'}
+            </p>
+          </div>
+
+          {/* Prix de vente ou prestation */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1">
+              Prix / Tarif (FCFA){' '}
+              {publicationType === 'marketplace' ? (
+                <span className="text-red-500 font-extrabold">(Obligatoire pour la Marketplace *)</span>
+              ) : (
+                <span className="text-neutral-400 font-normal">(Optionnel pour l'accueil)</span>
+              )}
+            </label>
+            <input
+              type="text"
+              placeholder={publicationType === 'marketplace' ? 'Ex: 25 000 FCFA *' : 'Ex: 15 000 FCFA ou Tarif sur devis'}
+              value={tarif}
+              onChange={(e) => {
+                setTarif(e.target.value);
+                if (errorMessage) setErrorMessage('');
+              }}
+              required={publicationType === 'marketplace'}
+              className={`w-full px-3.5 py-2.5 rounded-xl border text-xs focus:outline-none transition-colors ${
+                publicationType === 'marketplace' && !tarif.trim()
+                  ? 'border-amber-400 bg-amber-50/30 focus:border-[#FF6B00]'
+                  : 'border-neutral-300 focus:border-emerald-500'
+              }`}
+            />
+          </div>
 
           {/* Description */}
           <div>
