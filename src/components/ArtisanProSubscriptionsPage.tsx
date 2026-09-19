@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   History,
   MessageCircle,
+  CreditCard,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { api } from '../services/api.ts';
@@ -48,10 +49,10 @@ const PLANS: PlanDetail[] = [
   {
     key: 'essential',
     name: 'ESSENTIEL',
-    monthlyPrice: 300,
-    yearlyPrice: 4000,
-    monthlyDisplay: '300 FCFA',
-    yearlyDisplay: '4 000 FCFA',
+    monthlyPrice: 425,
+    yearlyPrice: 4700,
+    monthlyDisplay: '425 FCFA',
+    yearlyDisplay: '4 700 FCFA',
     description: 'La solution idéale pour démarrer et rendre vos services visibles auprès des clients locaux.',
     features: [
       'Visibilité dans l’annuaire officiel des artisans',
@@ -66,10 +67,10 @@ const PLANS: PlanDetail[] = [
     name: 'PRO',
     badge: 'RECOMMANDÉ',
     isPopular: true,
-    monthlyPrice: 700,
-    yearlyPrice: 8000,
-    monthlyDisplay: '700 FCFA',
-    yearlyDisplay: '8 000 FCFA',
+    monthlyPrice: 900,
+    yearlyPrice: 9200,
+    monthlyDisplay: '900 FCFA',
+    yearlyDisplay: '9 200 FCFA',
     description: 'Pour les professionnels voulant démultiplier leurs chantiers et obtenir le label vérifié.',
     features: [
       'Tous les avantages de la formule ESSENTIEL',
@@ -84,10 +85,10 @@ const PLANS: PlanDetail[] = [
     key: 'premium',
     name: 'PREMIUM',
     badge: 'VIP ÉLITE',
-    monthlyPrice: 1000,
-    yearlyPrice: 11000,
-    monthlyDisplay: '1 000 FCFA',
-    yearlyDisplay: '11 000 FCFA',
+    monthlyPrice: 1200,
+    yearlyPrice: 14325,
+    monthlyDisplay: '1 200 FCFA',
+    yearlyDisplay: '14 325 FCFA',
     description: 'Visibilité maximale et accompagnement d’élite pour dominer votre secteur d’activité.',
     features: [
       'Tous les avantages de la formule PRO',
@@ -333,8 +334,8 @@ export const ArtisanProSubscriptionsPage: React.FC = () => {
                     Paiement Wave Business instantané ({COUNTRIES_CONFIG[selectedCountry].flag} {COUNTRIES_CONFIG[selectedCountry].name})
                   </div>
                   <div className="text-[11px] text-neutral-300">
-                    Liens Wave directs officiels (300F, 700F, 1000F / mois ou 4000F, 8000F, 11000F / an).
-                    Synchronisation automatique de votre abonnement dans Firebase Firestore.
+                    Moyens de paiement officiels Kkiapay, Wave & Mobile Money (425F, 900F, 1200F / mois ou 4700F, 9200F, 14325F / an).
+                    Synchronisation automatique de votre abonnement et validation instantanée.
                   </div>
                 </div>
               </div>
@@ -527,23 +528,10 @@ export const ArtisanProSubscriptionsPage: React.FC = () => {
                       type="button"
                       id={`btn-choose-${plan.key}`}
                       onClick={() => handleChoosePlan(plan)}
-                      className={`w-full py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer ${
-                        isWaveCountry(selectedCountry)
-                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/25 hover:scale-[1.02]'
-                          : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/25 hover:scale-[1.02]'
-                      }`}
+                      className="w-full py-3.5 px-4 rounded-2xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer bg-gradient-to-r from-amber-500 to-[#FF6B00] hover:from-amber-600 hover:to-[#e05e00] text-white shadow-lg shadow-amber-500/25 hover:scale-[1.02]"
                     >
-                      {isWaveCountry(selectedCountry) ? (
-                        <>
-                          <Zap className="w-4 h-4 fill-current" />
-                          <span>PAYER AVEC WAVE ({priceDisplay})</span>
-                        </>
-                      ) : (
-                        <>
-                          <MessageCircle className="w-4 h-4" />
-                          <span>PAYER VIA WHATSAPP ({ADMIN_PHONE_NUMBER})</span>
-                        </>
-                      )}
+                      <CreditCard className="w-4 h-4" />
+                      <span>CHOISIR CETTE FORMULE ({priceDisplay})</span>
                     </button>
                   )}
                 </div>

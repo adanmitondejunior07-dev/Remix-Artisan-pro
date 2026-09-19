@@ -11,6 +11,7 @@ import {
   Lock,
   MessageCircle,
   Zap,
+  CreditCard,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -26,6 +27,11 @@ import {
   AfricanCountryCode,
   getSubscriptionAmount,
 } from '../services/paymentService.ts';
+import {
+  payerAbonnementKkiapay,
+  KKIAPAY_PLANS,
+  KkiapayPlanKey,
+} from '../services/kkiapay.ts';
 
 export interface CheckoutProps {
   isOpen: boolean;
@@ -50,6 +56,9 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
 }) => {
   const { currentUser, currentArtisan, refreshData, showToast } = useApp();
 
+  // Mode de paiement : Kkiapay (Mobile Money + Carte sans frais), Wave direct ou WhatsApp
+  const [selectedMethod, setSelectedMethod] = useState<'kkiapay' | 'wave' | 'whatsapp'>('kkiapay');
+
   // Country selection: default to initialCountry or user country
   const [selectedCountryCode, setSelectedCountryCode] = useState<AfricanCountryCode>(() => {
     const code = initialCountry.toUpperCase();
@@ -58,7 +67,7 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
   });
 
   const [customUserId, setCustomUserId] = useState<string>(
-    currentUser?.id ? String(currentUser.id) : currentArtisan?.id ? String(currentArtisan.id) : 'artisan_ci'
+    currentUser?.id ? String(currentUser.id) : currentArtisan?.id ? String(currentArtisan.id) : 'artisan123'
   );
 
   const [loading, setLoading] = useState<boolean>(false);
@@ -77,9 +86,13 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
   const currentCountry = COUNTRIES_CONFIG[selectedCountryCode] || COUNTRIES_CONFIG.CI;
   const isWave = isWaveCountry(selectedCountryCode);
 
-  // Exact amount calculated based on plan and billing period
+  // Exact amount calculated based on plan and billing period (425F, 900F, 1200F / 4700F, 9200F, 14325F)
   const finalAmount = getSubscriptionAmount(planKey, billingPeriod) || price;
-  const effectiveUserId = currentUser?.id ? String(currentUser.id) : customUserId || '1';
+  const effectiveUserId = currentUser?.id ? String(currentUser.id) : customUserId || 'artisan123';
+
+  // Map to Kkiapay planKey
+  const kkiapayKey: KkiapayPlanKey = `${planKey === 'essential' ? 'essentiel' : planKey}_${billingPeriod}` as KkiapayPlanKey;
+  const kkiapayPlan = KKIAPAY_PLANS[kkiapayKey] || KKIAPAY_PLANS.pro_mensuel;
 
   // Wave payment URL
   const waveUrl = getWavePaymentUrl(finalAmount);
@@ -93,9 +106,59 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
     userId: effectiveUserId,
   });
 
+  // Paiement via Kkiapay (NOUVEAUX PRIX ARTISAN PRO - CORRIGÉ)
+  const handleKkiapayPayment = async () => {
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      await payerAbonnementKkiapay(kkiapayKey, effectiveUserId, {
+        phone: currentUser?.phone || currentArtisan?.phone,
+        name: currentUser?.name || currentArtisan?.name,
+        email: currentUser?.email,
+        onSuccess: async (res) => {
+          // Synchroniser également dans Firestore
+          try {
+            await updateArtisanSubscriptionInFirestore({
+              userId: effectiveUserId,
+              plan: planKey,
+              amount: finalAmount,
+              pays: currentCountry.name,
+              artisanName: currentUser?.name || currentArtisan?.name,
+              artisanTrade: currentArtisan?.trade,
+            });
+          } catch (e) {
+            console.warn('Firestore update non-bloquant:', e);
+          }
+          await refreshData();
+          setLoading(false);
+          setStep('success');
+          showToast({
+            title: `Paiement ${finalAmount}F réussi !`,
+            desc: `Vous êtes maintenant abonné à la formule ${kkiapayPlan.nom}.`,
+            type: 'success',
+          });
+          if (onSuccess) onSuccess();
+        },
+        onError: (err) => {
+          setLoading(false);
+          setErrorMessage(err?.message || 'Erreur lors du paiement Kkiapay.');
+        },
+      });
+    } catch (e: any) {
+      setLoading(false);
+      setErrorMessage(e?.message || 'Erreur lors de l’ouverture du widget Kkiapay');
+    }
+  };
+
   // Action lorsque l'artisan clique sur Payer
   const handleInitiatePayment = async () => {
     setErrorMessage(null);
+
+    // Si l'utilisateur choisit Kkiapay
+    if (selectedMethod === 'kkiapay') {
+      await handleKkiapayPayment();
+      return;
+    }
 
     // Enregistrement de la demande en attente dans Firestore collection artisans
     try {
@@ -108,7 +171,7 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
           statut_paiement: 'en_attente',
           montant: finalAmount,
           pays: currentCountry.name,
-          methode_paiement: isWave ? 'Wave CI' : `WhatsApp ${selectedCountryCode}`,
+          methode_paiement: selectedMethod === 'wave' ? 'Wave' : `WhatsApp ${selectedCountryCode}`,
           telephone_admin: ADMIN_PHONE_NUMBER,
           date_paiement: serverTimestamp(),
           name: currentUser?.name || currentArtisan?.name || 'Artisan',
@@ -122,7 +185,7 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
       console.warn('Notice: enregistrement en attente Firestore non-bloquant:', e);
     }
 
-    if (isWave) {
+    if (selectedMethod === 'wave') {
       // Ouvre le lien Wave Business dans un nouvel onglet
       window.open(waveUrl, '_blank', 'noopener,noreferrer');
       setStep('wave_confirm');
@@ -277,9 +340,101 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
               </div>
             </div>
 
-            {/* Mode de paiement automatique configuré selon le pays */}
+            {/* Choix du moyen de paiement (Kkiapay Mobile Money/Carte, Wave, WhatsApp) */}
+            <div className="space-y-2">
+              <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+                Moyen de paiement sécurisé :
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  id="btn-select-kkiapay"
+                  onClick={() => setSelectedMethod('kkiapay')}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                    selectedMethod === 'kkiapay'
+                      ? 'bg-amber-500/20 border-amber-500 text-white shadow-lg shadow-amber-500/10'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-xs text-amber-400">KKIAPAY</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
+                      Direct
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-300 leading-tight">
+                    Mobile Money, Wave & Carte (Frais 1.5% inclus)
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-select-wave"
+                  onClick={() => setSelectedMethod('wave')}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                    selectedMethod === 'wave'
+                      ? 'bg-cyan-500/20 border-cyan-500 text-white shadow-lg shadow-cyan-500/10'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-xs text-cyan-400">WAVE</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold">
+                      0 frais
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-300 leading-tight">
+                    Lien Wave Business direct
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-select-whatsapp"
+                  onClick={() => setSelectedMethod('whatsapp')}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                    selectedMethod === 'whatsapp'
+                      ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-lg shadow-emerald-500/10'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-xs text-emerald-400">WHATSAPP</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                      Admin
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-300 leading-tight">
+                    Assistance {ADMIN_PHONE_NUMBER}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Détails du mode de paiement sélectionné */}
             <div className="space-y-3">
-              {isWave ? (
+              {selectedMethod === 'kkiapay' && (
+                <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-wide">
+                      <CreditCard className="w-4 h-4" />
+                      <span>Guichet Panafricain Kkiapay (Bénin, Côte d’Ivoire, Togo, Sénégal...)</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold">
+                      Instantané
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-300">
+                    Paiement sécurisé par MTN Mobile Money, Moov Money, Wave, Orange Money et Cartes Bancaires.
+                    Frais de 1.5% pris en charge, validation automatique sur votre espace artisan.
+                  </p>
+                  <div className="text-[11px] text-amber-300/80 font-mono pt-1">
+                    Formule : {kkiapayPlan.nom} — Montant : {kkiapayPlan.montant} FCFA
+                  </div>
+                </div>
+              )}
+
+              {selectedMethod === 'wave' && (
                 <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/40 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-cyan-400 font-black text-xs uppercase tracking-wide">
@@ -298,7 +453,9 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
                     Lien direct Wave : {waveUrl}
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {selectedMethod === 'whatsapp' && (
                 <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-emerald-400 font-black text-xs uppercase tracking-wide">
@@ -329,7 +486,29 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
 
             {/* Bouton d'action principal */}
             <div className="pt-2">
-              {isWave ? (
+              {selectedMethod === 'kkiapay' && (
+                <button
+                  type="button"
+                  id="btn-pay-kkiapay"
+                  onClick={handleInitiatePayment}
+                  disabled={loading}
+                  className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 to-[#FF6B00] hover:from-amber-600 hover:to-[#e05e00] text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-amber-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>OUVERTURE DU GUICHET KKIAPAY...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4" />
+                      <span>PAYER {finalAmount.toLocaleString()} FCFA AVEC KKIAPAY</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {selectedMethod === 'wave' && (
                 <button
                   type="button"
                   id="btn-pay-wave"
@@ -339,7 +518,9 @@ export const SubscriptionCheckoutModal: React.FC<CheckoutProps> = ({
                   <ExternalLink className="w-4 h-4" />
                   <span>PAYER {finalAmount.toLocaleString()} FCFA AVEC WAVE BUSINESS</span>
                 </button>
-              ) : (
+              )}
+
+              {selectedMethod === 'whatsapp' && (
                 <button
                   type="button"
                   id="btn-pay-whatsapp"

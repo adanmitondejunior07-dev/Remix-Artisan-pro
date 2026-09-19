@@ -900,8 +900,21 @@ export const AFRICAN_PAYMENT_COUNTRIES: AfricanPaymentCountry[] = [
   },
 ];
 
-// Global card options available across all countries
+// Global card and fintech options available across all countries
 export const GLOBAL_CARD_OPERATORS: AfricanPaymentOperator[] = [
+  {
+    id: 'kkiapay_global',
+    name: 'Kkiapay Panafricain (Mobile Money + Carte)',
+    type: 'fintech',
+    icon: '⚡',
+    color: '#FF6B00',
+    bgLight: 'bg-amber-50',
+    textColor: 'text-amber-900',
+    borderColor: 'border-amber-400',
+    feeText: 'Frais 1.5% inclus • Instantané',
+    instructions: 'Guichet Kkiapay officiel sécurisé : MTN, Moov, Wave, Orange Money et Cartes.',
+    popular: true,
+  },
   {
     id: 'visa_mastercard',
     name: 'Carte Visa / Mastercard Panafricaine',

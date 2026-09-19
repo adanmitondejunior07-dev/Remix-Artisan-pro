@@ -96,17 +96,17 @@ export const COUNTRIES_CONFIG: Record<AfricanCountryCode, CountryInfo> = {
   },
 };
 
-// Grille tarifaire officielle Artisan Pro Afrique
+// Grille tarifaire officielle Artisan Pro Afrique (NOUVEAUX PRIX ARTISAN PRO - CORRIGÉ)
 export const SUBSCRIPTION_PRICES = {
   monthly: {
-    essentiel: 300,
-    pro: 700,
-    premium: 1000,
+    essentiel: 425,
+    pro: 900,
+    premium: 1200,
   },
   yearly: {
-    essentiel: 4000,
-    pro: 8000,
-    premium: 11000,
+    essentiel: 4700,
+    pro: 9200,
+    premium: 14325,
   },
 } as const;
 
@@ -119,7 +119,7 @@ export type BillingPeriod = 'monthly' | 'yearly';
 export function getSubscriptionAmount(plan: string, period: BillingPeriod = 'monthly'): number {
   const normalizedPlan = (plan.toLowerCase() === 'essential' ? 'essentiel' : plan.toLowerCase()) as PlanKey;
   const periodKey = period === 'yearly' ? 'yearly' : 'monthly';
-  return SUBSCRIPTION_PRICES[periodKey][normalizedPlan] || (periodKey === 'yearly' ? 8000 : 700);
+  return SUBSCRIPTION_PRICES[periodKey][normalizedPlan] || (periodKey === 'yearly' ? 9200 : 900);
 }
 
 /**
