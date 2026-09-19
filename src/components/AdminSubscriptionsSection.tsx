@@ -41,13 +41,11 @@ export const AdminSubscriptionsSection: React.FC = () => {
   const { showToast, checkSubscriptionStatus, currentUser } = useApp();
   const [data, setData] = useState<SubscriptionsSummary | null>(null);
 
-  // Liste des 3 super admins fondateurs autorisés
+  // Administrateur Suprême Unique
   const superAdmins = [
     'adanmitondejunior07@gmail.com',
-    'artisanpro.afrique@gmail.com',
-    'contactartisanproafrica@gmail.com',
   ];
-  const isSuperAdmin = superAdmins.includes(currentUser?.email?.toLowerCase() || '') || currentUser?.role === 'super_admin';
+  const isSuperAdmin = superAdmins.includes(currentUser?.email?.toLowerCase() || '') || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
   const [loading, setLoading] = useState(true);
   const [searchTx, setSearchTx] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'breakdowns' | 'transactions'>('overview');
@@ -174,7 +172,7 @@ export const AdminSubscriptionsSection: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-neutral-500">
-              Super Admin Fondateurs (adanmitondejunior07@gmail.com, artisanpro.afrique@gmail.com, contactartisanproafrica@gmail.com) • Validation stricte par Webhook
+              Administrateur Suprême (adanmitondejunior07@gmail.com) • Validation stricte par Webhook
             </p>
           </div>
         </div>

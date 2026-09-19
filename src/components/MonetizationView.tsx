@@ -1038,10 +1038,8 @@ export const MonetizationView: React.FC = () => {
             </p>
             {([
               'adanmitondejunior07@gmail.com',
-              'artisanpro.afrique@gmail.com',
-              'contactartisanproafrica@gmail.com',
-              'admin@artisanpro.afrique',
             ].includes(currentUser?.email?.toLowerCase() || '') ||
+              currentUser?.role === 'admin' ||
               currentUser?.role === 'super_admin') && (
               <div className="pt-2 flex flex-col sm:flex-row gap-1.5">
                 <button

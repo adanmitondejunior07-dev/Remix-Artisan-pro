@@ -20,13 +20,10 @@ export const BottomNav: React.FC = () => {
 
   const superAdmins = [
     'adanmitondejunior07@gmail.com',
-    'artisanpro.afrique@gmail.com',
-    'contactartisanproafrica@gmail.com',
   ];
 
   const isAdmin =
     superAdmins.includes(currentUser?.email?.toLowerCase() || '') ||
-    currentUser?.email === 'admin@artisanpro.afrique' ||
     currentUser?.role === 'admin' ||
     currentUser?.role === 'super_admin';
   const isArtisan =
@@ -35,7 +32,6 @@ export const BottomNav: React.FC = () => {
     Boolean(currentUser?.artisanId);
   const isClient = currentUser?.role === 'client' || (!currentUser && !isAdmin);
 
-  const isHomeActive = page === 'home';
   const isArtisansActive = page === 'search' || page === 'map';
   const isMessagesActive = page === 'messages';
   const isGainsActive = page === 'subscription';
@@ -45,34 +41,11 @@ export const BottomNav: React.FC = () => {
 
   return (
     <nav
-      aria-label="Barre de navigation mobile style WhatsApp"
+      aria-label="Barre de navigation mobile"
       className="fixed bottom-0 left-0 right-0 z-40 bg-white/98 backdrop-blur-md border-t border-neutral-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-2 py-1.5 md:hidden"
     >
       <div className="max-w-md mx-auto flex items-center justify-around">
-        {/* 1. Accueil (icône maison) */}
-        <button
-          type="button"
-          onClick={() => go('home')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all duration-150 min-w-[56px] cursor-pointer ${
-            isHomeActive
-              ? 'text-[#FF7A00] font-bold'
-              : 'text-neutral-500 hover:text-neutral-900'
-          }`}
-        >
-          <div className="relative">
-            <Home
-              className={`w-5 h-5 transition-transform ${
-                isHomeActive ? 'scale-110 text-[#FF7A00]' : 'text-neutral-500'
-              }`}
-            />
-          </div>
-          <span className="text-[10px] mt-1 tracking-tight leading-none">Accueil</span>
-          {isHomeActive && (
-            <span className="w-1.5 h-1.5 rounded-full bg-[#FF7A00] mt-0.5 animate-in fade-in" />
-          )}
-        </button>
-
-        {/* 2. Artisans (icône marteau en Orange vif #FF7A00) */}
+        {/* 1. Artisans (Recherche / Carte) */}
         <button
           type="button"
           onClick={() => go('search')}

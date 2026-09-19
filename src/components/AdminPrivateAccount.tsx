@@ -29,10 +29,8 @@ import {
   increment,
 } from 'firebase/firestore';
 
-// 3 Emails Administrateurs Fondateurs STRICTEMENT autorisés
+// Unique Email Administrateur Suprême STRICTEMENT autorisé
 export const ADMIN_EMAILS = [
-  'contactartisanproafrica@gmail.com',
-  'artisanpro.afrique@gmail.com',
   'adanmitondejunior07@gmail.com',
 ];
 
@@ -215,7 +213,7 @@ export const AdminPrivateAccount: React.FC = () => {
           telephone_prive: '0503444508',
           solde: increment(Number(montantNum)),
           derniere_recharge: serverTimestamp(),
-          email: 'artisanpro.afrique@gmail.com\ncontactartisanproafrica@gmail.com\nadanmitondejunior07@gmail.com',
+          email: 'adanmitondejunior07@gmail.com',
           recharge_par: currentUserEmail,
           admins_autorises: ADMIN_EMAILS,
         },

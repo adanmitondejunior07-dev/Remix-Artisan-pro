@@ -33,13 +33,13 @@ export const Admin3RolesBanner: React.FC<Admin3RolesBannerProps> = ({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FF6B00]/20 border border-[#FF6B00]/40 text-[#FF6B00] text-xs font-black uppercase tracking-wider">
             <Shield className="w-3.5 h-3.5" />
-            <span>=== 3 ADMIN - ARTISANPRO AFRIQUE ===</span>
+            <span>ADMINISTRATEUR SUPRÊME UNIQUE</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white mt-1.5">
-            Gouvernance & Répartition des Rôles Administrateurs
+            Administration Centrale de la Plateforme
           </h2>
           <p className="text-xs sm:text-sm text-neutral-300 max-w-2xl leading-relaxed">
-            Chaque administrateur dispose d'une vue spécialisée avec attribution automatique de son écran de bord selon son adresse email habilitée.
+            Espace de contrôle réservé à l'administrateur suprême officiel pour piloter les artisans, les validations et l'envers du décor.
           </p>
         </div>
 

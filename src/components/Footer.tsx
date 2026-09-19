@@ -8,13 +8,10 @@ export const Footer: React.FC = () => {
 
   const superAdmins = [
     'adanmitondejunior07@gmail.com',
-    'artisanpro.afrique@gmail.com',
-    'contactartisanproafrica@gmail.com',
   ];
 
   const isAdmin =
     superAdmins.includes(currentUser?.email?.toLowerCase() || '') ||
-    currentUser?.email === 'admin@artisanpro.afrique' ||
     currentUser?.role === 'admin' ||
     currentUser?.role === 'super_admin';
 
@@ -73,11 +70,6 @@ export const Footer: React.FC = () => {
               <li>
                 <button onClick={() => go('map')} className="hover:text-amber-400 transition-colors">
                   Carte interactive & Artisans proches
-                </button>
-              </li>
-              <li>
-                <button onClick={() => go('market')} className="hover:text-amber-400 transition-colors">
-                  Marketplace des services (20 pays)
                 </button>
               </li>
               <li>

@@ -142,7 +142,7 @@ export const AdminTechniqueCinetPaySection: React.FC = () => {
               Supervision Technique & Passerelle CinetPay
             </h2>
             <p className="text-xs sm:text-sm text-neutral-300 max-w-2xl leading-relaxed">
-              Console d'ingénierie réservée aux <strong>Super Admins Fondateurs</strong> (adanmitondejunior07@gmail.com, artisanpro.afrique@gmail.com, contactartisanproafrica@gmail.com). Surveillance des flux monétiques, des webhooks IPN et intégrité des transactions.
+              Console d'ingénierie réservée à l'<strong>Administrateur Suprême</strong> (adanmitondejunior07@gmail.com). Surveillance des flux monétiques, des webhooks IPN et intégrité des transactions.
             </p>
           </div>
 

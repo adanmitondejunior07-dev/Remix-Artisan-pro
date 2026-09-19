@@ -18,12 +18,12 @@ export const DesktopLeftSidebar: React.FC = () => {
         <h2 className="font-bold text-xl mb-6 text-neutral-900 tracking-tight">ArtisanPro</h2>
         <nav className="space-y-1">
           <div
-            onClick={() => go('home')}
+            onClick={() => go('search')}
             className={`p-3 rounded-lg cursor-pointer transition-colors font-semibold text-sm ${
-              page === 'home' ? 'bg-orange-100 text-orange-600' : 'text-neutral-700 hover:bg-neutral-100'
+              page === 'search' ? 'bg-orange-100 text-orange-600' : 'text-neutral-700 hover:bg-neutral-100'
             }`}
           >
-            {t.accueil}
+            🔍 Trouver un artisan
           </div>
           {currentUser && (
             <div
@@ -36,32 +36,6 @@ export const DesktopLeftSidebar: React.FC = () => {
               <span>Mon Profil</span>
             </div>
           )}
-          <div
-            onClick={() => go('market')}
-            className={`p-3 rounded-lg cursor-pointer transition-colors font-semibold text-sm ${
-              page === 'market' ? 'bg-orange-100 text-orange-600' : 'text-neutral-700 hover:bg-neutral-100'
-            }`}
-          >
-            {t.marketplace} 🛒
-          </div>
-          <div
-            onClick={() => {
-              sessionStorage.setItem('open_market_modal', '1');
-              go('market');
-              setTimeout(() => {
-                (window as any).openMarketModal?.();
-              }, 120);
-            }}
-            className="p-3 rounded-lg cursor-pointer transition-colors font-bold text-sm bg-orange-50 text-[#FF6B00] hover:bg-orange-100 flex items-center justify-between border border-orange-200"
-          >
-            <span className="flex items-center gap-2">
-              <span>🏷️</span>
-              <span>Vendre un article</span>
-            </span>
-            <span className="text-[10px] bg-[#FF6B00] text-white font-extrabold px-1.5 py-0.5 rounded">
-              Photo
-            </span>
-          </div>
           <div
             onClick={() => go('artisan-verification')}
             className={`p-3 rounded-lg cursor-pointer transition-colors font-medium text-sm ${

@@ -345,20 +345,10 @@ const defaultArtisans: Artisan[] = [
 
 const defaultUsers: User[] = [
   {
-    id: 'user-admin-principal',
-    name: 'Admin Principal ArtisanPro Africa',
-    email: 'contactartisanproafrica@gmail.com',
-    role: 'super_admin' as const,
-    phone: '+225 0503444508',
-    city: 'Abidjan',
-    country: 'Côte d’Ivoire',
-    avatar: '🛡️',
-  },
-  {
     id: 'user-admin-adan',
-    name: 'Adan Mitonde (Admin Secondaire)',
+    name: 'ADANMITONDE GERAUD',
     email: 'adanmitondejunior07@gmail.com',
-    role: 'super_admin' as const,
+    role: 'admin' as const,
     phone: '+225 0503444508',
     city: 'Abidjan',
     country: 'Côte d’Ivoire',

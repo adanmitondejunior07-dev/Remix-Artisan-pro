@@ -154,21 +154,18 @@ export const AdminPage: React.FC = () => {
   >('withdrawals');
   const [withdrawalStatusFilter, setWithdrawalStatusFilter] = useState<'all' | 'en_attente' | 'approuve' | 'refuse'>('all');
 
-  // === 3 SUPER ADMINS FONDATEURS - ARTISANPRO AFRIQUE ===
+  // === ADMINISTRATEUR SUPRÊME UNIQUE - ARTISANPRO AFRIQUE ===
   const superAdmins = [
     'adanmitondejunior07@gmail.com',
-    'artisanpro.afrique@gmail.com',
-    'contactartisanproafrica@gmail.com',
   ];
   const isSuperAdminUser =
-    superAdmins.includes(currentUser?.email?.toLowerCase() || '') ||
+    currentUser?.email?.toLowerCase() === 'adanmitondejunior07@gmail.com' ||
     isSuperAdmin(currentUser) ||
+    currentUser?.role === 'admin' ||
     currentUser?.role === 'super_admin';
 
-  // Détermination de l'admin actif et de son écran attribué
-  const initialAdminEmail = currentUser?.email && admins.some(a => a.email.toLowerCase() === currentUser.email.toLowerCase())
-    ? currentUser.email
-    : 'artisanpro.afrique@gmail.com';
+  // Détermination de l'admin actif : Administrateur Suprême Unique
+  const initialAdminEmail = 'adanmitondejunior07@gmail.com';
   const [selectedAdminEmail, setSelectedAdminEmail] = useState<string>(initialAdminEmail);
 
   // Initialisation automatique selon le rôle de l'administrateur connecté
@@ -525,10 +522,8 @@ export const AdminPage: React.FC = () => {
   const basePlatformTotal = 154050;
   const platformRevenue = Math.max(0, basePlatformTotal - founderWithdrawnAmount);
 
-  // Sécurité absolue : Bouton visible et action autorisée UNIQUEMENT pour les 3 Super Administrateurs :
+  // Sécurité absolue : Bouton visible et action autorisée UNIQUEMENT pour l'Administrateur Suprême :
   // - adanmitondejunior07@gmail.com
-  // - artisanpro.afrique@gmail.com
-  // - contactartisanproafrica@gmail.com
   const canWithdrawFounder = isFounderSuperAdmin(currentUser);
 
   // État du modal de retrait Fondateur
@@ -1094,7 +1089,7 @@ export const AdminPage: React.FC = () => {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-black uppercase tracking-wider">
               <Shield className="w-3.5 h-3.5" />
-              <span>Super Administration ({currentUser?.email || 'contactartisanproafrica@gmail.com'})</span>
+              <span>Administration Suprême ({currentUser?.email || 'adanmitondejunior07@gmail.com'})</span>
             </div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-950 text-xs font-black uppercase tracking-wider border border-amber-300">
               <span>Fondateur: ADANMITONDE GERAUD</span>

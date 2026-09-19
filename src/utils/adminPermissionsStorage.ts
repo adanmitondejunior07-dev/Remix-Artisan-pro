@@ -39,8 +39,6 @@ const STORAGE_KEY = 'admin_permissions';
  * Emails autorisés à modifier les permissions et la gestion d'équipe
  */
 export const DG_AND_BACKUP_EMAILS = [
-  'artisanproafrique@gmail.com',
-  'artisanpro.afrique@gmail.com', // rétrocompatibilité point
   'adanmitondejunior07@gmail.com',
 ];
 

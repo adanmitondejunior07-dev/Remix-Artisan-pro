@@ -58,11 +58,9 @@ export const Navbar: React.FC = () => {
     };
   }, []);
 
-  // Liste des 3 super admins fondateurs officiels
+  // Administrateur Suprême Unique officiel
   const superAdmins = [
     'adanmitondejunior07@gmail.com',
-    'artisanpro.afrique@gmail.com',
-    'contactartisanproafrica@gmail.com',
   ];
 
   const isSuperAdminUser =
@@ -73,10 +71,8 @@ export const Navbar: React.FC = () => {
   const isAdmin = isSuperAdminUser || currentUser?.role === 'admin';
 
   const navItems: { label: string; page: PageName; icon: React.ReactNode }[] = [
-    { label: 'Accueil', page: 'home', icon: null },
     { label: 'Trouver un artisan', page: 'search', icon: <Search className="w-3.5 h-3.5" /> },
     { label: 'Carte GPS', page: 'map', icon: <MapPin className="w-3.5 h-3.5" /> },
-    { label: 'Marketplace', page: 'market', icon: <ShoppingBag className="w-3.5 h-3.5" /> },
     { label: 'Messagerie', page: 'messages', icon: <MessageSquare className="w-3.5 h-3.5" /> },
     ...(isSuperAdminUser
       ? [
@@ -139,7 +135,7 @@ export const Navbar: React.FC = () => {
           ☰
         </button>
         <button
-          onClick={() => go('home')}
+          onClick={() => go('search')}
           className="cursor-pointer border-none bg-transparent p-0 flex items-center gap-1.5 text-left"
         >
           <b style={{ color: 'white', fontSize: '19px' }}>
@@ -269,24 +265,6 @@ export const Navbar: React.FC = () => {
           </div>
 
           <div className="py-1 text-xs">
-            <button
-              onClick={() => {
-                sessionStorage.setItem('open_market_modal', '1');
-                go('market');
-                setUserDropdownOpen(false);
-                setTimeout(() => {
-                  (window as any).openMarketModal?.();
-                }, 120);
-              }}
-              className="w-full px-4 py-2.5 text-left hover:bg-[#2a2a2a] font-bold text-[#FF6B00] flex items-center justify-between transition-colors cursor-pointer border-b border-[#2a2a2a]"
-            >
-              <span className="flex items-center gap-2.5">
-                <ShoppingBag className="w-4 h-4 text-[#FF6B00]" />
-                <span>Vendre un article</span>
-              </span>
-              <span className="text-[10px] bg-[#FF6B00] text-white px-1.5 py-0.5 rounded font-black">Photo</span>
-            </button>
-
             <button
               onClick={() => {
                 go('profile');

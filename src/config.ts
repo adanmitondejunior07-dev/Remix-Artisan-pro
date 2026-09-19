@@ -1,64 +1,44 @@
 /**
  * Configuration de l'application ArtisanPro Africa
- * Emails officiels et Gestion des Administrateurs Système
+ * Administrateur Suprême Unique de l'Application
  */
-import type { AdminRecord } from './types.ts';
+import type { AdminRecord, User } from './types.ts';
 
-// Email général et officiel de l'application (Support, Contact, Notifications, Envois automatiques)
-export const OFFICIAL_APP_EMAIL = 'contactartisanproafrica@gmail.com';
-export const SUPPORT_EMAIL = 'contactartisanproafrica@gmail.com';
+// Administrateur Suprême Unique Officiel
+export const SUPREME_ADMIN_EMAIL = 'adanmitondejunior07@gmail.com';
+export const OFFICIAL_APP_EMAIL = 'adanmitondejunior07@gmail.com';
+export const SUPPORT_EMAIL = 'adanmitondejunior07@gmail.com';
 
-// 1. Admin Principal (DG) & 2. Admin Secondaire (Créateur) & 3. Support Technique
-export const PRIMARY_ADMIN_EMAIL = 'artisanproafrique@gmail.com';
-export const SECONDARY_ADMIN_EMAIL = 'adanmitondejunior07@gmail.com';
-export const FOUNDER_EMAIL = 'adanmitondejunior07@gmail.com';
-export const TECH_SUPPORT_ADMIN_EMAIL = 'contactartisanproafrica@gmail.com';
+export const PRIMARY_ADMIN_EMAIL = SUPREME_ADMIN_EMAIL;
+export const SECONDARY_ADMIN_EMAIL = SUPREME_ADMIN_EMAIL;
+export const FOUNDER_EMAIL = SUPREME_ADMIN_EMAIL;
+export const TECH_SUPPORT_ADMIN_EMAIL = SUPREME_ADMIN_EMAIL;
 
-// Les trois super admins fondateurs officiels
-export const superAdmins: string[] = [
-  'artisanproafrique@gmail.com',
+// Emails totalement révoqués et désactivés de tout accès administrateur
+export const DEACTIVATED_ADMIN_EMAILS = [
   'artisanpro.afrique@gmail.com',
   'contactartisanproafrica@gmail.com',
-  'adanmitondejunior07@gmail.com',
+  'artisanproafrique@gmail.com',
 ];
 
-// Les trois emails officiels SUPER ADMINISTRATION autorisés à retirer les Revenus Plateforme Fondateur
-export const SUPER_ADMIN_FOUNDER_EMAILS: string[] = superAdmins;
+// L'unique Super Admin suprême officiel
+export const superAdmins: string[] = [SUPREME_ADMIN_EMAIL];
 
-// Emails administrateurs autorisés depuis les variables d'environnement
-const envAdminEmails =
-  typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_ADMIN_EMAILS
-    ? (import.meta.env.VITE_ADMIN_EMAILS as string).split(',').map((e) => e.trim().toLowerCase())
-    : [];
+// Unique email autorisé pour les revenus plateforme & administration complète
+export const SUPER_ADMIN_FOUNDER_EMAILS: string[] = [SUPREME_ADMIN_EMAIL];
 
-export const ADMIN_EMAILS: string[] = Array.from(
-  new Set([
-    'artisanproafrique@gmail.com',
-    'artisanpro.afrique@gmail.com',
-    PRIMARY_ADMIN_EMAIL,
-    SECONDARY_ADMIN_EMAIL,
-    FOUNDER_EMAIL,
-    ...SUPER_ADMIN_FOUNDER_EMAILS,
-    // Rétrocompatibilité interne
-    'admin@artisanpro.afrique',
-    ...envAdminEmails,
-  ])
-);
+export const ADMIN_EMAILS: string[] = [SUPREME_ADMIN_EMAIL];
 
 /**
- * TABLE DES ADMINS (admins table)
- * Contient les 2 administrateurs avec rôle super_admin et droits complets :
- * - Voir le tableau de bord
- * - Gérer les utilisateurs
- * - Gérer les commandes et devis
- * - Supprimer / bloquer
- * - Finances et retraits
+ * TABLE DE L'ADMIN UNIQUE (admins table)
+ * adanmitondejunior07@gmail.com possède UNIQUEMENT le rôle "ADMIN".
+ * Il ne doit avoir ni le rôle d'artisan, ni le rôle de client. C'est l'administrateur direct.
  */
 export const ADMINS_TABLE: AdminRecord[] = [
   {
-    id: 'admin-dg-1',
-    name: 'DG DIRECTEUR GÉNÉRAL PRINCIPAL',
-    email: PRIMARY_ADMIN_EMAIL, // artisanproafrique@gmail.com
+    id: 'admin-supreme-adan',
+    name: 'ADANMITONDE GERAUD',
+    email: SUPREME_ADMIN_EMAIL,
     role: 'super_admin',
     isPrimary: true,
     phone: '+225 0503444508',
@@ -78,160 +58,73 @@ export const ADMINS_TABLE: AdminRecord[] = [
       'broadcast',
     ],
   },
-  {
-    id: 'admin-support-2',
-    name: 'SUPPORT TECHNIQUE & CLIENT',
-    email: OFFICIAL_APP_EMAIL, // contactartisanproafrica@gmail.com
-    role: 'super_admin',
-    isPrimary: false,
-    phone: '+225 0503444508',
-    whatsapp: '+2250503444508',
-    city: 'Abidjan',
-    country: 'Côte d’Ivoire',
-    joinedDate: '2023-10-01',
-    permissions: [
-      'dashboard',
-      'users_view',
-      'orders_view',
-      'withdrawals_manage',
-      'broadcast',
-    ],
-  },
-  {
-    id: 'admin-createur-3',
-    name: 'ADANMITONDE GERAUD (Créateur Secours)',
-    email: SECONDARY_ADMIN_EMAIL, // adanmitondejunior07@gmail.com
-    role: 'super_admin',
-    isPrimary: false,
-    phone: '+225 0503444508',
-    whatsapp: '+2250503444508',
-    city: 'Abidjan',
-    country: 'Côte d’Ivoire',
-    joinedDate: '2023-10-01',
-    permissions: [
-      'dashboard',
-      'users_view',
-      'users_delete',
-      'users_block',
-      'orders_view',
-      'orders_manage',
-      'withdrawals_manage',
-      'financials',
-      'broadcast',
-    ],
-  },
 ];
 
 /**
- * Vérifie si un email appartient à la liste confidentielle des administrateurs
+ * Vérifie si un email correspond à l'unique Administrateur Suprême
  */
 export function isExactAdminEmail(email?: string | null): boolean {
   if (!email) return false;
   const normalized = email.toLowerCase().trim();
-  return ADMIN_EMAILS.includes(normalized);
+  if (DEACTIVATED_ADMIN_EMAILS.includes(normalized)) {
+    return false;
+  }
+  return normalized === SUPREME_ADMIN_EMAIL.toLowerCase();
 }
 
 /**
- * Vérifie les privilèges Super Administrateur
+ * Vérifie les privilèges Administrateur pour l'admin unique
  */
 export function isSuperAdmin(user?: { role?: string; email?: string } | null): boolean {
-  if (!user) return false;
-  const email = user.email?.toLowerCase().trim();
-  if (email && superAdmins.includes(email)) return true;
-  if (user.role === 'super_admin') return true;
-  return isExactAdminEmail(user.email);
+  if (!user || !user.email) return false;
+  const email = user.email.toLowerCase().trim();
+  if (DEACTIVATED_ADMIN_EMAILS.includes(email)) {
+    return false;
+  }
+  return email === SUPREME_ADMIN_EMAIL.toLowerCase();
 }
 
 /**
  * Sécurité stricte Revenus Plateforme Fondateur :
- * Visible et retirable UNIQUEMENT pour les 3 emails de la SUPER ADMINISTRATION :
- * - adanmitondejunior07@gmail.com
- * - artisanpro.afrique@gmail.com
- * - contactartisanproafrica@gmail.com
- * Les artisans ou autres rôles ne peuvent en aucun cas voir ni retirer ce montant.
+ * Visible et géré UNIQUEMENT par l'administrateur unique : adanmitondejunior07@gmail.com
  */
 export function isFounderSuperAdmin(user?: { email?: string; role?: string } | null): boolean {
   if (!user || !user.email) return false;
   const normalized = user.email.toLowerCase().trim();
-  return SUPER_ADMIN_FOUNDER_EMAILS.includes(normalized);
+  if (DEACTIVATED_ADMIN_EMAILS.includes(normalized)) {
+    return false;
+  }
+  return normalized === SUPREME_ADMIN_EMAIL.toLowerCase();
 }
 
 /**
- * Numéro de support technique officiel & support retraits approuvés
+ * Numéro de support officiel
  */
 export const SUPPORT_PHONE = '+225 0503444508';
 export const SUPPORT_PHONE_DISPLAY = '+225 05 03 44 45 08';
 export const SUPPORT_WHATSAPP_LINK = 'https://wa.me/2250503444508';
 
 /**
- * Génère ou récupère le profil utilisateur officiel Super Administrateur
+ * Récupère le profil administrateur officiel pour l'administrateur unique
  */
-export function getAdminUserByEmail(email: string) {
+export function getAdminUserByEmail(email: string): User | null {
   const normalized = email.toLowerCase().trim();
-  const matchedAdmin = ADMINS_TABLE.find((a) => a.email.toLowerCase() === normalized);
-
-  if (normalized === 'adanmitondejunior07@gmail.com' || normalized.includes('adan')) {
+  if (DEACTIVATED_ADMIN_EMAILS.includes(normalized)) {
+    return null;
+  }
+  if (normalized === SUPREME_ADMIN_EMAIL.toLowerCase() || normalized.includes('adan')) {
     return {
       id: 'user-admin-adan',
-      name: matchedAdmin?.name || 'ADANMITONDE GERAUD (Créateur Secours)',
-      email: 'adanmitondejunior07@gmail.com',
-      role: 'super_admin' as const,
+      name: 'ADANMITONDE GERAUD',
+      email: SUPREME_ADMIN_EMAIL,
+      role: 'admin' as const, // Strictement rôle "ADMIN"
       phone: '+225 0503444508',
-      whatsapp: '+2250503444508',
+      telephone: '+2250503444508',
       city: 'Abidjan',
       country: 'Côte d’Ivoire',
-      joinedDate: '2023-10-01',
-      bio: 'Créateur / Contrôle Total Secours: ADANMITONDE GERAUD.',
-      adminPermissions: {
-        allowVoip: true,
-        allowScreenShare: true,
-        allowViewAllProfiles: true,
-        allowDeleteAccount: true,
-        allowTechSupportMode: true,
-      },
+      bio: 'Administrateur Suprême Unique - ArtisanPro Afrique.',
+      artisanId: undefined,
     };
   }
-
-  if (normalized === 'contactartisanproafrica@gmail.com') {
-    return {
-      id: 'user-admin-support',
-      name: matchedAdmin?.name || 'SUPPORT TECHNIQUE & CLIENT',
-      email: 'contactartisanproafrica@gmail.com',
-      role: 'super_admin' as const,
-      phone: '+225 0503444508',
-      whatsapp: '+2250503444508',
-      city: 'Abidjan',
-      country: 'Côte d’Ivoire',
-      joinedDate: '2023-10-01',
-      bio: 'Support Technique & Client ArtisanPro Africa.',
-      adminPermissions: {
-        allowVoip: true,
-        allowScreenShare: true,
-        allowViewAllProfiles: true,
-        allowDeleteAccount: false,
-        allowTechSupportMode: true,
-      },
-    };
-  }
-
-  // Default: DG Directeur Général Principal
-  return {
-    id: 'user-admin-dg',
-    name: matchedAdmin?.name || 'DG DIRECTEUR GÉNÉRAL PRINCIPAL',
-    email: 'artisanproafrique@gmail.com',
-    role: 'super_admin' as const,
-    phone: '+225 0503444508',
-    whatsapp: '+2250503444508',
-    city: 'Abidjan',
-    country: 'Côte d’Ivoire',
-    joinedDate: '2023-10-01',
-    bio: 'Direction Générale et Supervision Globale de la plateforme ArtisanPro Africa.',
-    adminPermissions: {
-      allowVoip: true,
-      allowScreenShare: true,
-      allowViewAllProfiles: true,
-      allowDeleteAccount: true,
-      allowTechSupportMode: true,
-    },
-  };
+  return null;
 }

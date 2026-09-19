@@ -298,8 +298,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   });
 
-  // Always start on home (feed of artisans), never on account/profile
-  const [page, setPage] = useState<PageName>('home');
+  // Always start on search (recherche d'artisans), page d'accueil supprimée
+  const [page, setPage] = useState<PageName>('search');
   const [artisans, setArtisans] = useState<Artisan[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -661,7 +661,12 @@ function loadLocalArtisanPosts(): SocialPost[] {
       setSelectedUserId(null);
       setSelectedUser(null);
     }
-    setPage(targetPage);
+    // Rediriger toute tentative d'aller sur home ou market vers la recherche d'artisans
+    const actualPage =
+      (targetPage as string) === 'home' || (targetPage as string) === 'market'
+        ? 'search'
+        : targetPage;
+    setPage(actualPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
@@ -979,9 +984,9 @@ function loadLocalArtisanPosts(): SocialPost[] {
       const notifs = await api.getNotifications(effectiveUser.id);
       setNotifications(notifs);
 
-      // Redirection automatique vers Accueil (feed des artisans)
+      // Redirection automatique vers Recherche des artisans
       if (shouldRedirect) {
-        go('home');
+        go('search');
       }
     },
     [artisans, go, showToast]
@@ -1512,7 +1517,7 @@ function loadLocalArtisanPosts(): SocialPost[] {
       desc: 'Inscrivez-vous ou connectez-vous pour voir Artisan Pro',
       type: 'info',
     });
-    setPage('home');
+    setPage('search');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [showToast]);
 

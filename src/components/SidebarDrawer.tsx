@@ -143,20 +143,6 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
           {/* SECTION 1: NAVIGATION PRINCIPALE */}
           <div className="px-2 space-y-0.5">
             <button
-              onClick={() => handleNavigate('home')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-semibold transition-colors cursor-pointer ${
-                page === 'home'
-                  ? 'bg-orange-50 text-[#FF6B00]'
-                  : 'text-neutral-800 hover:bg-[#F3F4F6] active:bg-[#E5E7EB]'
-              }`}
-            >
-              <div className="w-9 h-9 rounded-lg bg-[#F3F4F6] flex items-center justify-center text-base shrink-0">
-                🏠
-              </div>
-              <span className="truncate">Fil d'actualité</span>
-            </button>
-
-            <button
               onClick={() => handleNavigate('search')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-semibold transition-colors cursor-pointer ${
                 page === 'search'
@@ -179,9 +165,9 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
               }`}
             >
               <div className="w-9 h-9 rounded-lg bg-[#F3F4F6] flex items-center justify-center text-base shrink-0">
-                💼
+                👤
               </div>
-              <span className="truncate">Mes publications</span>
+              <span className="truncate">Mon profil</span>
             </button>
 
             <button
@@ -253,45 +239,6 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({ isOpen, onClose })
                 <span className="bg-[#EF4444] text-white font-bold text-[11px] w-5 h-5 rounded-full flex items-center justify-center shrink-0">
                   {notifCount}
                 </span>
-              </button>
-
-              <button
-                onClick={() => handleNavigate('market')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-semibold transition-colors cursor-pointer ${
-                  page === 'market'
-                    ? 'bg-orange-50 text-[#FF6B00]'
-                    : 'text-neutral-800 hover:bg-[#F3F4F6] active:bg-[#E5E7EB]'
-                }`}
-              >
-                <div className="w-9 h-9 rounded-lg bg-orange-100 text-[#FF6B00] flex items-center justify-center text-base shrink-0">
-                  🛒
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="truncate font-bold">Marketplace</div>
-                  <div className="text-[11px] text-neutral-500 truncate">Catalogue & Commandes directes</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => {
-                  sessionStorage.setItem('open_market_modal', '1');
-                  handleNavigate('market');
-                  setTimeout(() => {
-                    (window as any).openMarketModal?.();
-                  }, 120);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-semibold transition-colors cursor-pointer bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 border border-orange-200 text-[#FF6B00]"
-              >
-                <div className="w-9 h-9 rounded-lg bg-[#FF6B00] text-white flex items-center justify-center text-base shrink-0 shadow-2xs">
-                  🏷️
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="truncate font-bold text-neutral-900 flex items-center justify-between">
-                    <span>Vendre un article</span>
-                    <span className="text-[10px] bg-[#FF6B00] text-white font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">Photo</span>
-                  </div>
-                  <div className="text-[11px] text-[#FF6B00] font-medium truncate">Mettre en vente sur la Marketplace</div>
-                </div>
               </button>
 
               <button

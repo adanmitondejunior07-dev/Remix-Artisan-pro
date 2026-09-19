@@ -4,11 +4,9 @@ import { LangProvider } from './LangContext.tsx';
 import { Navbar } from './components/Navbar.tsx';
 import { Footer } from './components/Footer.tsx';
 import { BottomNav } from './components/BottomNav.tsx';
-import { HomePage } from './components/HomePage.tsx';
 import { SearchPage } from './components/SearchPage.tsx';
 import { ProfilePage } from './components/ProfilePage.tsx';
 import { MapPage } from './components/MapPage.tsx';
-import { MarketplacePage } from './components/MarketplacePage.tsx';
 import { MessagesPage } from './components/MessagesPage.tsx';
 import { AccountPage } from './components/AccountPage.tsx';
 import { RegisterArtisanPage } from './components/RegisterArtisanPage.tsx';
@@ -149,16 +147,12 @@ const AppContent: React.FC = () => {
 
   const renderActivePage = () => {
     switch (page) {
-      case 'home':
-        return <HomePage />;
       case 'search':
         return <SearchPage />;
       case 'profile':
         return <ProfilePage />;
       case 'map':
         return <MapPage />;
-      case 'market':
-        return <MarketplacePage />;
       case 'messages':
         return <MessagesPage />;
       case 'account':
@@ -174,16 +168,16 @@ const AppContent: React.FC = () => {
       case 'admin': {
         const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || isSuperAdmin(currentUser);
         if (!isAdmin) {
-          go('home');
-          return <HomePage />;
+          go('search');
+          return <SearchPage />;
         }
         return <AdminPage />;
       }
       case 'admin-paiements': {
         const canAccessAdminPayments = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || isSuperAdmin(currentUser);
         if (!canAccessAdminPayments) {
-          go('home');
-          return <HomePage />;
+          go('search');
+          return <SearchPage />;
         }
         return <AdminPaymentsPage />;
       }
@@ -218,7 +212,7 @@ const AppContent: React.FC = () => {
           </div>
         );
       default:
-        return <HomePage />;
+        return <SearchPage />;
     }
   };
 
