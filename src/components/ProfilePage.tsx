@@ -52,6 +52,7 @@ import {
   getArtisanBanner,
 } from '../data/profileBanners.ts';
 import { api } from '../services/api.ts';
+import { getSupabaseSession, getSupabaseUserProfile } from '../services/supabase.ts';
 import type { CallRecord, SocialPost, Artisan } from '../types.ts';
 import { SocialPostCard } from './SocialPostCard.tsx';
 import { PublierRealisation } from './PublierRealisation.tsx';
@@ -99,6 +100,45 @@ export const ProfilePage: React.FC = () => {
     (isOwnProfile && (currentUser?.role === 'artisan' || currentArtisan))
   );
 
+  // FIX DU NOM DE PROFIL : Utilise la session active 'supabase.auth.session()'
+  // Bloque l'affichage tant que les données ne sont pas chargées pour éviter que le nom change ou saute.
+  const [isSessionLoading, setIsSessionLoading] = useState<boolean>(Boolean(isOwnProfile && !currentUser));
+  const [sessionProfileName, setSessionProfileName] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function syncActiveSession() {
+      try {
+        const session = await getSupabaseSession();
+        if (session?.user?.id && isMounted) {
+          const profile = await getSupabaseUserProfile(session.user.id);
+          if (profile && isMounted) {
+            const resolvedName = profile.nom || (profile.prenom ? `${profile.prenom} ${profile.nom || ''}`.trim() : null);
+            if (resolvedName) {
+              setSessionProfileName(resolvedName);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Session profile check:', err);
+      } finally {
+        if (isMounted) {
+          setIsSessionLoading(false);
+        }
+      }
+    }
+
+    if (isOwnProfile) {
+      syncActiveSession();
+    } else {
+      setIsSessionLoading(false);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOwnProfile, currentUser?.id]);
+
   // Informations effectives du profil affiché - Résolution stable garantie sans clignotement
   const targetUserObj = isOwnProfile
     ? currentUser
@@ -110,7 +150,7 @@ export const ProfilePage: React.FC = () => {
       ) || null);
 
   const targetName = isOwnProfile
-    ? (currentUser?.name || currentArtisan?.name || 'Mon Profil')
+    ? (sessionProfileName || currentUser?.nom || currentUser?.name || currentArtisan?.name || 'Mon Profil')
     : (selectedArtisan?.name || targetUserObj?.name || selectedUser?.name || 'Profil Membre');
 
   // EMAIL DU PROFIL
@@ -540,6 +580,19 @@ export const ProfilePage: React.FC = () => {
   };
 
   const canEdit = isOwnProfile || isSuperAdmin(currentUser) || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+
+  // Bloque l'affichage tant que la session et le profil ne sont pas résolus pour éviter tout saut de nom
+  if (isSessionLoading) {
+    return (
+      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-8 space-y-4">
+        <div className="w-10 h-10 border-3 border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
+        <div className="text-center space-y-1">
+          <p className="text-sm font-bold text-neutral-800">Chargement sécurisé du profil...</p>
+          <p className="text-xs text-neutral-400">Synchronisation de la session utilisateur en cours</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-neutral-100/70 pb-24">

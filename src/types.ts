@@ -1,9 +1,27 @@
+export interface CriteresMonetisation {
+  identite_verifiee?: boolean; // 1. Identité Vérifiée (Copie de la pièce d'identité conforme)
+  telephone_actif?: boolean; // 2. Numéro Téléphone Actif (Vérifié par SMS ou appel)
+  localisation_precise?: boolean; // 3. Localisation Précise (Zone d'intervention ou atelier enregistré)
+  photo_professionnelle?: boolean; // 4. Photo de Profil Professionnelle (Visage net, pas d'avatar)
+  metier_clair?: boolean; // 5. Nom de l'Entreprise ou Métier Clair (Ex: Plombier, Électricien)
+  portfolio_rempli?: boolean; // 6. Portfolio Rempli (Au moins 3 photos de réalisations réelles)
+  tarifs_indiques?: boolean; // 7. Tarifs ou Grille Indiquée (Prestations transparentes)
+  disponibilites_renseignees?: boolean; // 8. Disponibilités Renseignées (Jours et heures de travail)
+  casier_judiciaire?: boolean; // 9. Casier Judiciaire / Attestation (Optionnel selon le pays pour la sécurité)
+  contrat_accepte?: boolean; // 10. Contrat d'Utilisation Accepté (Règles de bonne conduite de la plateforme)
+  paiement_configure?: boolean; // 11. Configuration du Paiement (Compte Mobile Money lié pour la monétisation)
+  test_reactivite?: boolean; // 12. Test de Réactivité (L'artisan a répondu au premier message test)
+  frais_inscription?: boolean; // 13. Frais d'Inscription Validés (Si forfait ou abonnement de départ payé)
+  [key: string]: boolean | undefined;
+}
+
 export type PlanType = 'Free' | 'Pro' | 'Premium';
 export type UserRole = 'client' | 'artisan' | 'admin' | 'super_admin';
 
 export interface Artisan {
   id: number;
   name: string;
+  nom?: string;
   trade: string;
   city: string;
   country: string;
@@ -14,11 +32,15 @@ export interface Artisan {
   services: string[];
   description: string;
   phone: string;
+  telephone?: string;
   email: string;
   lat: number;
   lng: number;
   verified: boolean;
   is_verified?: boolean;
+  est_verifie?: boolean;
+  score_validation?: number; // 0 à 13
+  criteres_monetisation?: CriteresMonetisation;
   hasPaid10k?: boolean;
   a_paye_10k?: boolean;
   hasPaidActivation13k?: boolean;
@@ -104,13 +126,18 @@ export type MonetizationStatus =
 export interface User {
   id: string;
   name: string;
+  nom?: string;
   firstName?: string;
   lastName?: string;
   email: string;
   role: UserRole;
   phone: string;
+  telephone?: string;
   city: string;
   country: string;
+  est_verifie?: boolean;
+  score_validation?: number; // 0 à 13
+  criteres_monetisation?: CriteresMonetisation;
   latitude?: number;
   longitude?: number;
   location_authorized?: boolean;
@@ -334,11 +361,16 @@ export type PublicationType = 'accueil' | 'marketplace';
 export interface DbUser {
   id: string;
   nom: string;
-  prenom: string;
-  role: 'admin' | 'artisan' | 'client';
   telephone?: string;
+  role: 'admin' | 'artisan' | 'client';
+  est_verifie?: boolean;
+  score_validation?: number; // Entier 0 à 13
+  criteres_monetisation?: CriteresMonetisation;
+  // Propriétés de compatibilité
+  prenom?: string;
   photo_profil?: string;
   localisation?: string;
+  email?: string;
 }
 
 export interface DbPublication {

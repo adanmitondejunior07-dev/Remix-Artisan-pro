@@ -24,6 +24,7 @@ import { useApp } from '../context/AppContext.tsx';
 import { api } from '../services/api.ts';
 import { Artisan, User, MonetizationStatus } from '../types.ts';
 import { evaluateMonetizationConditions } from '../utils/monetizationEvaluation.ts';
+import { AdminArtisansValidationTable } from './AdminArtisansValidationTable.tsx';
 
 interface AdminMonetizationSectionProps {
   onRefresh?: () => void;
@@ -41,6 +42,7 @@ export const AdminMonetizationSection: React.FC<AdminMonetizationSectionProps> =
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | MonetizationStatus>('all');
   const [expandedArtisanId, setExpandedArtisanId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'table_13' | 'demandes'>('table_13');
 
   // Modal de refus avec motif obligatoire
   const [rejectingTarget, setRejectingTarget] = useState<{
@@ -219,35 +221,68 @@ export const AdminMonetizationSection: React.FC<AdminMonetizationSectionProps> =
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-neutral-200 p-6 shadow-xs space-y-6">
-      {/* En-tête de section */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-neutral-100 pb-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-2xl bg-[#FF6B00]/10 text-[#FF6B00]">
-              <Coins className="w-5 h-5" />
-            </span>
-            <h2 className="text-lg sm:text-xl font-black text-neutral-900">
-              Système de Validation de Monétisation
-            </h2>
-          </div>
-          <p className="text-xs text-neutral-500 mt-1 max-w-2xl">
-            Règle stricte ArtisanPro : Un artisan ne peut jamais s'auto-valider. Seul le Super Admin peut approuver ou refuser après contrôle complet des 13 conditions.
-          </p>
-        </div>
+    <div className="space-y-6">
+      {/* Switcher de vue entre les 13 critères et les demandes */}
+      <div className="flex items-center gap-2 bg-neutral-100 p-1.5 rounded-2xl w-fit">
+        <button
+          type="button"
+          onClick={() => setViewMode('table_13')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            viewMode === 'table_13'
+              ? 'bg-[#FF6B00] text-white shadow-xs'
+              : 'text-neutral-600 hover:text-neutral-900'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span>Tableau des 13 Critères (Certification Complète)</span>
+        </button>
 
-        {/* Barre de recherche */}
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
-          <input
-            type="text"
-            placeholder="Rechercher un artisan..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-200 text-xs focus:outline-none focus:border-[#FF6B00] bg-neutral-50/50"
-          />
-        </div>
+        <button
+          type="button"
+          onClick={() => setViewMode('demandes')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            viewMode === 'demandes'
+              ? 'bg-neutral-900 text-white shadow-xs'
+              : 'text-neutral-600 hover:text-neutral-900'
+          }`}
+        >
+          <Coins className="w-4 h-4" />
+          <span>Demandes de Validation ({counts.pending})</span>
+        </button>
       </div>
+
+      {viewMode === 'table_13' ? (
+        <AdminArtisansValidationTable onRefresh={onRefresh} />
+      ) : (
+        <div className="bg-white rounded-3xl border border-neutral-200 p-6 shadow-xs space-y-6">
+          {/* En-tête de section */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-neutral-100 pb-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-2xl bg-[#FF6B00]/10 text-[#FF6B00]">
+                  <Coins className="w-5 h-5" />
+                </span>
+                <h2 className="text-lg sm:text-xl font-black text-neutral-900">
+                  Système de Validation de Monétisation
+                </h2>
+              </div>
+              <p className="text-xs text-neutral-500 mt-1 max-w-2xl">
+                Règle stricte ArtisanPro : Un artisan ne peut jamais s'auto-valider. Seul le Super Admin peut approuver ou refuser après contrôle complet des 13 conditions.
+              </p>
+            </div>
+
+            {/* Barre de recherche */}
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Rechercher un artisan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-neutral-200 text-xs focus:outline-none focus:border-[#FF6B00] bg-neutral-50/50"
+              />
+            </div>
+          </div>
 
       {/* Barre de filtres de statut */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
@@ -774,6 +809,8 @@ export const AdminMonetizationSection: React.FC<AdminMonetizationSectionProps> =
               </button>
             </div>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

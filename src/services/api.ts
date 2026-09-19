@@ -912,6 +912,43 @@ export const api = {
     return updated;
   },
 
+  async updateArtisanMonetisation(
+    artisanId: number,
+    userId: string | undefined,
+    criteres: import('../types.ts').CriteresMonetisation,
+    score: number,
+    estVerifie: boolean
+  ): Promise<void> {
+    const payload = {
+      criteres_monetisation: criteres,
+      score_validation: score,
+      est_verifie: estVerifie,
+      verified: estVerifie,
+      is_verified: estVerifie,
+      monetization_status: estVerifie ? 'active' : 'pending_validation',
+    };
+
+    // 1. Update artisan via API
+    try {
+      await this.updateArtisan(artisanId, payload);
+    } catch (e) {
+      console.warn('API updateArtisan fallback:', e);
+    }
+
+    // 2. Update linked user via API if present
+    if (userId) {
+      try {
+        await this.updateUser(userId, {
+          criteres_monetisation: criteres,
+          score_validation: score,
+          est_verifie: estVerifie,
+        });
+      } catch (e) {
+        console.warn('API updateUser fallback:', e);
+      }
+    }
+  },
+
   async broadcastNotification(title: string, message: string): Promise<AppNotification> {
     const res = await fetch(`${BASE_URL}/admin/broadcast`, {
       method: 'POST',
